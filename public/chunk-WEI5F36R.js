@@ -1,0 +1,1 @@
+import{a as e}from"./chunk-Q2HHWBKA.js";import{b as a}from"./chunk-MCE4IIOZ.js";import{$ as o,V as t}from"./chunk-VDH5VFWZ.js";var i=class r{url=`${e.apiUrl}/turnosTrabajo`;http=o(a);findAll(){return this.http.get(this.url)}static \u0275fac=function(n){return new(n||r)};static \u0275prov=t({token:r,factory:r.\u0275fac,providedIn:"root"})};export{i as a};

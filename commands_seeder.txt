@@ -1,0 +1,27 @@
+npx sequelize-cli seed:generate --name estadosCiviles
+
+
+npx sequelize-cli db:seed --seed seeders/20250410055714-paises.js
+npx sequelize-cli db:seed --seed seeders/20250410055736-regiones.js
+npx sequelize-cli db:seed --seed seeders/20250410055751-provincias.js
+npx sequelize-cli db:seed --seed seeders/20250410055802-ciudades.js
+npx sequelize-cli db:seed --seed seeders/20250410181757-tipoDocIdent.js
+npx sequelize-cli db:seed --seed seeders/20250410181760-estadoAsistencia.js
+npx sequelize-cli db:seed --seed seeders/20250410181813-tiempoContrato.js
+npx sequelize-cli db:seed --seed seeders/20250410181827-frecuenciaPago.js
+npx sequelize-cli db:seed --seed seeders/20250410225828-estadosCiviles.js
+npx sequelize-cli db:seed --seed seeders/20250411095025-parametros.js
+npx sequelize-cli db:seed --seed seeders/20250415232958-tipoTurnos.js
+npx sequelize-cli db:seed --seed seeders/20250425000031-fondoPensiones.js
+npx sequelize-cli db:seed --seed seeders/20250425000046-seguros.js
+npx sequelize-cli db:seed --seed seeders/20250425145258-turnosTrabajo.js
+npx sequelize-cli db:seed --seed seeders/20250506183326-roles.js
+npx sequelize-cli db:seed --seed seeders/20250506183337-usuarios.js
+npx sequelize-cli db:seed --seed seeders/20250506183354-cargos.js
+npx sequelize-cli db:seed --seed seeders/20250506183354-grupoModulos.js
+npx sequelize-cli db:seed --seed seeders/20250506183404-modulos.js
+npx sequelize-cli db:seed --seed seeders/20250506183654-permisoRoles.js
+npx sequelize-cli db:seed --seed seeders/20250624072759-sedes.js
+npx sequelize-cli db:seed --seed seeders/20250624172119-asignacionSedeUsuarios.js
+
+

@@ -1,0 +1,142 @@
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Patch,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
+import { ReemplaceroService } from './reemplacero.service';
+import { Reemplacero } from './reemplacero.model';
+import { FaceService } from '@modules/face/face.service';
+import { ReemplaceroDTO } from './reemplacero.dto';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '@core/auth/jwt.guard';
+import { CurrentUser } from '@common/decorators/current-user.decorator';
+import { Usuario } from '@modules/usuario/usuario.model';
+import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
+import { PaginatedResponse } from '@common/interfaces/paginated-response.interface';
+
+@Controller('reemplacero')
+export class ReemplaceroController {
+  constructor(
+    private readonly service: ReemplaceroService,
+    private readonly faceService: FaceService,
+  ) {}
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  findAll(
+    @CurrentUser() user: Usuario,
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<Reemplacero>> {
+    return this.service.findAll(
+      user,
+      query.limit!,
+      query.offset!,
+      query.q?.filter,
+      query.q?.search,
+    );
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  findOne(@Param('id') id: string): Promise<Reemplacero | null> {
+    return this.service.findOne(id);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  @UseInterceptors(FileInterceptor('archivo'))
+  async create(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: ReemplaceroDTO,
+  ): Promise<Reemplacero | null> {
+    if (file) {
+      dto.archivoNombre = file.originalname;
+      let descriptor: Float32Array | null =
+        await this.faceService.getDescriptorFromBuffer(file.buffer);
+      if (!descriptor) {
+        throw new BadRequestException('No se detectó rostro en la imagen');
+      }
+      return this.service.create(
+        dto,
+        Buffer.from(file.buffer),
+        Array.from(descriptor),
+      );
+    } else {
+      return this.service.create(dto, undefined, undefined);
+    }
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  @UseInterceptors(FileInterceptor('archivo'))
+  async update(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: ReemplaceroDTO,
+  ): Promise<[number, Reemplacero[]]> {
+    if (file) {
+      dto.archivoNombre = file.originalname;
+      let descriptor: Float32Array | null =
+        await this.faceService.getDescriptorFromBuffer(file.buffer);
+      if (!descriptor) {
+        throw new BadRequestException('No se detectó un rostro en la imagen');
+      }
+      const archivo = Buffer.from(file.buffer);
+      return this.service.update(id, dto, archivo, Array.from(descriptor));
+    }
+    return this.service.update(id, dto, undefined, undefined);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('changeStatus/:id/:isActive')
+  changeStatus(
+    @Param('id') id: string,
+    @Param('isActive') isActive: boolean,
+  ): Promise<[number, Reemplacero[]]> {
+    return this.service.changeStatus(id, isActive);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  delete(@Param('id') id: string): Promise<void> {
+    return this.service.delete(id);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Patch('restore/:id')
+  restore(@Param('id') id: string): Promise<void> {
+    return this.service.restore(id);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('obtenerArchivo/:id')
+  async obtenerArchivo(@Param('id') id: string, @Res() res: Response) {
+    const archivo = await this.service.obtenerArchivo(id);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${archivo.fileName}"`,
+    );
+    res.setHeader('Content-Type', 'application/octet-stream');
+    return res.send(archivo.file);
+  }
+}
