@@ -3,6 +3,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   HasMany,
@@ -15,6 +16,9 @@ import { Asistencia } from '@modules/asistencia/asistencia.model';
 import { Sede } from '@modules/sede/sede.model';
 import { AsistenciaUsuario } from '@modules/asistencia-usuario/asistencia-usuario.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'dispositivos',
   paranoid: true,

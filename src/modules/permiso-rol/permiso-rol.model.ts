@@ -1,18 +1,18 @@
 import { Modulo } from '@modules/modulo/modulo.model';
 import { Rol } from '@modules/rol/rol.model';
 import {
-  BelongsTo,
   Column,
   DataType,
-  Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
-  Index,
   Model,
-  PrimaryKey,
   Table,
 } from 'sequelize-typescript';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'permisorol',
   paranoid: true,

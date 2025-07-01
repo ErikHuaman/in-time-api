@@ -16,10 +16,14 @@ import { BloqueHoras } from '@modules/bloque-horas/bloque-horas.model';
 import { Usuario } from '@modules/usuario/usuario.model';
 import { PaginatedResponse } from '@common/interfaces/paginated-response.interface';
 import { HorarioTrabajadorRepository } from './horario-trabajador.repository';
+import { HorarioTrabajadorItemRepository } from '@modules/horario-trabajador-item/horario-trabajador-item.repository';
 
 @Injectable()
 export class HorarioTrabajadorService {
-  constructor(private readonly repository: HorarioTrabajadorRepository) {}
+  constructor(
+    private readonly repository: HorarioTrabajadorRepository,
+    private readonly itemRepository: HorarioTrabajadorItemRepository,
+  ) {}
 
   async findAll(
     user: Usuario,
@@ -78,10 +82,37 @@ export class HorarioTrabajadorService {
     });
   }
 
-  async create(dto: HorarioTrabajadorDTO): Promise<HorarioTrabajador | null> {
+  async create(
+    dto: Partial<HorarioTrabajador>,
+  ): Promise<HorarioTrabajador | null> {
     try {
       const orden = await this.repository.getNextOrderValue();
-      return this.repository.create({ ...dto, orden });
+      const itemOrden = await this.itemRepository.getNextOrderValue();
+      return this.repository.create(
+        {
+          ...dto,
+          orden,
+          items:
+            dto.items?.map((horario, i) => {
+              const { bloque, ...item } = horario;
+              item.numDiaSalida = !bloque
+                ? item.numDia
+                : bloque.horaSalida < bloque.horaEntrada
+                  ? item.numDia == 7
+                    ? 1
+                    : item.numDia + 1
+                  : item.numDia;
+              return { ...item, orden: itemOrden + i } as HorarioTrabajadorItem;
+            }) ?? [],
+        },
+        {
+          include: [
+            {
+              model: HorarioTrabajadorItem,
+            },
+          ],
+        },
+      );
     } catch (error) {
       if (error.name === 'SequelizeUniqueConstraintError') {
         throw new BadRequestException('Ya existe un registro con ese valor');

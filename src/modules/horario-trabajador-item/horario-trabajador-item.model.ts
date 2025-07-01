@@ -3,6 +3,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   HasMany,
@@ -17,6 +18,9 @@ import { HorarioTrabajador } from '@modules/horario-trabajador/horario-trabajado
 import { Sede } from '@modules/sede/sede.model';
 import { JustificacionInasistencia } from '@modules/justificacion-inasistencia/justificacion-inasistencia.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'horarioTrabajadorItem',
   paranoid: true,

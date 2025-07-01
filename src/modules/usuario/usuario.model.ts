@@ -1,21 +1,34 @@
-import { AsignacionSedeUsuario } from '@modules/asignacion-sede-usuario/asignacion-sede-usuario.model';
-import { Rol } from '@modules/rol/rol.model';
-import { Sede } from '@modules/sede/sede.model';
-import { TipoDocIdent } from '@modules/tipo-doc-ident/tipo-doc-ident.model';
 import {
   BelongsTo,
   BelongsToMany,
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   HasMany,
   Model,
   PrimaryKey,
+  Scopes,
   Table,
 } from 'sequelize-typescript';
+import { AsignacionSedeUsuario } from '@modules/asignacion-sede-usuario/asignacion-sede-usuario.model';
+import { Rol } from '@modules/rol/rol.model';
+import { Sede } from '@modules/sede/sede.model';
+import { TipoDocIdent } from '@modules/tipo-doc-ident/tipo-doc-ident.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['archivo', 'descriptor', 'password', 'deletedAt'] }, // Excluir campo de eliminación lógica, archivo, descriptor y password por defecto
+}))
+@Scopes(() => ({
+  withPassword: {
+    attributes: { include: ['password'] },
+  }, // Devolver password para casos especificos
+  withArchivo: {
+    attributes: { include: ['archivo'] },
+  }, // Devolver password para casos especificos
+}))
 @Table({
   tableName: 'usuario',
   timestamps: true,

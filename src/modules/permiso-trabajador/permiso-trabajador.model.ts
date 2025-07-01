@@ -3,18 +3,28 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   HasMany,
   Index,
   Model,
   PrimaryKey,
+  Scopes,
   Table,
 } from 'sequelize-typescript';
 import { Cargo } from '@modules/cargo/cargo.model';
 import { Sede } from '@modules/sede/sede.model';
 import { Trabajador } from '@modules/trabajador/trabajador.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['archivo', 'deletedAt'] }, // Excluir campo de eliminación lógica y archivo por defecto
+}))
+@Scopes(() => ({
+  withArchivo: {
+    attributes: { include: ['archivo'] },
+  }, // Devolver archivo para casos especificos
+}))
 @Table({
   tableName: 'permisoTrabajador',
   paranoid: true,

@@ -25,6 +25,7 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import { Usuario } from '@modules/usuario/usuario.model';
 import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
 import { PaginatedResponse } from '@common/interfaces/paginated-response.interface';
+import { Trabajador } from '@modules/trabajador/trabajador.model';
 
 type AgrupadoPorUsuario = {
   idUsuario: string;
@@ -41,7 +42,7 @@ export class AlertaController {
     private readonly alertaGateway: AlertaGateway,
   ) {}
 
-  @Cron('*/5 * * * *') // cada 5 minutos
+  @Cron('*/1 * * * *') // cada 1 minutos
   async verificarRetrasos() {
     const fecha = new Date();
     fecha.setHours(0, 0, 0, 0);
@@ -50,12 +51,12 @@ export class AlertaController {
     const sedes = await this.sedeService.findByFecha(fecha);
 
     const resultados = sedes.map((s: Sede) => {
-      const sede = s.get();
+      const sede = s.toJSON();
       return {
-        usuarios: sede.asignacionUsuario.map((item) => item?.get()?.idUsuario),
         ...sede,
-        trabajadores: sede.asignacion
-          .map((at: AsignacionSede) => {
+        usuarios: sede.usuarios.map((item) => item?.id),
+        trabajadores: sede.trabajadores
+          .map((trabajador: Trabajador) => {
             const {
               contratos,
               horarios,
@@ -64,47 +65,44 @@ export class AlertaController {
               contactos,
               vacaciones,
               permisos,
-              ...trabajador
-            } = at.get()?.trabajador?.get();
-            const { items, ...horario } = horarios[0]?.get();
+            } = trabajador;
+            const { items, ...horario } = horarios[0];
             const itemDia = items.find(
-              (h: HorarioTrabajadorItem) =>
-                h?.get()?.numDia === diaMes.diaSemana,
+              (h: HorarioTrabajadorItem) => h?.numDia === diaMes.diaSemana,
             );
-            const asistenciaDia = asistencias[0]?.get();
+            const asistenciaDia = asistencias[0];
             const horarioEntrada = new Date(diaMes.fecha);
             horarioEntrada.setHours(
-              itemDia?.get()?.bloque?.get()?.horaEntrada ?? 0,
-              itemDia?.get()?.bloque?.get()?.minutoEntrada ?? 0,
+              itemDia?.bloque?.horaEntrada ?? 0,
+              itemDia?.bloque?.minutoEntrada ?? 0,
             );
             const horarioSalida = new Date(diaMes.fecha);
             horarioSalida.setDate(
-              itemDia?.get()?.bloque?.get()?.horaSalida <
-                itemDia?.get()?.bloque?.get()?.horaEntrada
+              itemDia?.bloque?.horaSalida! < itemDia?.bloque?.horaEntrada!
                 ? horarioSalida.getDate() + 1
                 : horarioSalida.getDate(),
             );
             horarioSalida.setHours(
-              itemDia?.get()?.bloque?.get()?.horaSalida ?? 0,
-              itemDia?.get()?.bloque?.get()?.minutoSalida ?? 0,
+              itemDia?.bloque?.horaSalida ?? 0,
+              itemDia?.bloque?.minutoSalida ?? 0,
             );
             const fechaNow = new Date();
             return {
               ...trabajador,
-              cargo: contratos[0]?.cargo?.get(),
-              turno: horario.turno?.get(),
-              contacto: contactos[0]?.get(),
-              info: infos[0]?.get(),
+              cargo: contratos[0]?.cargo,
+              turno: horario.turno,
+              contacto: contactos[0],
+              info: infos[0],
               horario: {
                 fecha: diaMes.fecha,
-                entrada: !itemDia?.get()?.bloque?.get()
+                entrada: !itemDia?.bloque
                   ? null
                   : new Intl.DateTimeFormat('default', {
                       hour: '2-digit',
                       minute: '2-digit',
                       hour12: false, // para formato 24 horas
                     }).format(horarioEntrada),
-                salida: !itemDia?.get()?.bloque?.get()
+                salida: !itemDia?.bloque
                   ? null
                   : new Intl.DateTimeFormat('default', {
                       hour: '2-digit',
@@ -131,7 +129,7 @@ export class AlertaController {
               fechaNow,
               horarioEntrada,
               horarioSalida,
-              asignado: !!itemDia?.get()?.bloque?.get(),
+              asignado: !!itemDia?.bloque,
               estado: asistenciaDia?.marcacionEntrada
                 ? new Date(asistenciaDia?.marcacionEntrada).getTime() >
                   new Date(horarioEntrada).getTime() + 600
@@ -154,32 +152,45 @@ export class AlertaController {
 
       for (const alerta of nuevos) {
         if (!mapa.has(alerta.idUsuario)) {
-          mapa.set(alerta?.get()?.idUsuario, {
-            idUsuario: alerta?.get()?.idUsuario,
+          mapa.set(alerta?.idUsuario, {
+            idUsuario: alerta?.idUsuario,
             nuevos: [],
             historicos: [],
           });
         }
-        mapa.get(alerta?.get()?.idUsuario)!.historicos.push(alerta?.get());
+        mapa.get(alerta?.idUsuario)!.historicos.push(alerta);
       }
 
       for (const alerta of historicos) {
         if (!mapa.has(alerta.idUsuario)) {
-          mapa.set(alerta?.get()?.idUsuario, {
-            idUsuario: alerta?.get()?.idUsuario,
+          mapa.set(alerta?.idUsuario, {
+            idUsuario: alerta?.idUsuario,
             nuevos: [],
             historicos: [],
           });
         }
-        mapa.get(alerta?.get()?.idUsuario)!.historicos.push(alerta?.get());
+        mapa.get(alerta?.idUsuario)!.historicos.push(alerta);
       }
 
       return Array.from(mapa.values());
     };
 
-    const historicos = await this.service.findAllByFecha(fecha);
+    const historicos = (await this.service.findAllHistoric()).map(
+      (item: Alerta) => item.toJSON(),
+    );
 
     const alertas = resultados
+      .map((item: any) => {
+        const { trabajadores, ...data } = item;
+        return {
+          ...data,
+          trabajadores: trabajadores.filter((trabajador) =>
+            trabajador.horarios.some((horario) =>
+              horario.items.some((i) => i.sede.id === item.id),
+            ),
+          ),
+        };
+      })
       .filter((item) =>
         item.trabajadores.some((t) => t.estado === 'no_asistio'),
       )
@@ -199,15 +210,15 @@ export class AlertaController {
       .map((a) => {
         const alerta = historicos.find((al) => {
           return (
-            al?.get()?.idSede == a.idSede &&
-            al?.get()?.idUsuario == a.idUsuario &&
-            al?.get()?.idTrabajador == a.idTrabajador &&
-            new Date(al?.get()?.fechaEntrada).getTime() ==
+            al?.idSede == a.idSede &&
+            al?.idUsuario == a.idUsuario &&
+            al?.idTrabajador == a.idTrabajador &&
+            new Date(al?.fechaEntrada).getTime() ==
               new Date(a.fechaEntrada).getTime()
           );
         });
         return {
-          id: alerta?.get()?.id,
+          id: alerta?.id,
           ...a,
         };
       })
@@ -286,12 +297,12 @@ export class AlertaController {
     const sedes = await this.sedeService.findByFecha(fecha);
 
     const resultados = sedes.map((s: Sede) => {
-      const sede = s.get();
+      const sede = s.toJSON();
       return {
-        usuarios: sede.asignacionUsuario.map((item) => item?.get()?.idUsuario),
         ...sede,
-        trabajadores: sede.asignacion
-          .map((at: AsignacionSede) => {
+        usuarios: sede.usuarios.map((item) => item?.id),
+        trabajadores: sede.trabajadores
+          .map((trabajador: Trabajador) => {
             const {
               contratos,
               horarios,
@@ -300,47 +311,44 @@ export class AlertaController {
               contactos,
               vacaciones,
               permisos,
-              ...trabajador
-            } = at.get()?.trabajador?.get();
-            const { items, ...horario } = horarios[0]?.get();
+            } = trabajador;
+            const { items, ...horario } = horarios[0];
             const itemDia = items.find(
-              (h: HorarioTrabajadorItem) =>
-                h?.get()?.numDia === diaMes.diaSemana,
+              (h: HorarioTrabajadorItem) => h?.numDia === diaMes.diaSemana,
             );
-            const asistenciaDia = asistencias[0]?.get();
+            const asistenciaDia = asistencias[0];
             const horarioEntrada = new Date(diaMes.fecha);
             horarioEntrada.setHours(
-              itemDia?.get()?.bloque?.get()?.horaEntrada ?? 0,
-              itemDia?.get()?.bloque?.get()?.minutoEntrada ?? 0,
+              itemDia?.bloque?.horaEntrada ?? 0,
+              itemDia?.bloque?.minutoEntrada ?? 0,
             );
             const horarioSalida = new Date(diaMes.fecha);
             horarioSalida.setDate(
-              itemDia?.get()?.bloque?.get()?.horaSalida <
-                itemDia?.get()?.bloque?.get()?.horaEntrada
+              itemDia?.bloque?.horaSalida! < itemDia?.bloque?.horaEntrada!
                 ? horarioSalida.getDate() + 1
                 : horarioSalida.getDate(),
             );
             horarioSalida.setHours(
-              itemDia?.get()?.bloque?.get()?.horaSalida ?? 0,
-              itemDia?.get()?.bloque?.get()?.minutoSalida ?? 0,
+              itemDia?.bloque?.horaSalida ?? 0,
+              itemDia?.bloque?.minutoSalida ?? 0,
             );
             const fechaNow = new Date();
             return {
               ...trabajador,
-              cargo: contratos[0]?.cargo?.get(),
-              turno: horario.turno?.get(),
-              contacto: contactos[0]?.get(),
-              info: infos[0]?.get(),
+              cargo: contratos[0]?.cargo,
+              turno: horario.turno,
+              contacto: contactos[0],
+              info: infos[0],
               horario: {
                 fecha: diaMes.fecha,
-                entrada: !itemDia?.get()?.bloque?.get()
+                entrada: !itemDia?.bloque
                   ? null
                   : new Intl.DateTimeFormat('default', {
                       hour: '2-digit',
                       minute: '2-digit',
                       hour12: false, // para formato 24 horas
                     }).format(horarioEntrada),
-                salida: !itemDia?.get()?.bloque?.get()
+                salida: !itemDia?.bloque
                   ? null
                   : new Intl.DateTimeFormat('default', {
                       hour: '2-digit',
@@ -367,7 +375,7 @@ export class AlertaController {
               fechaNow,
               horarioEntrada,
               horarioSalida,
-              asignado: !!itemDia?.get()?.bloque?.get(),
+              asignado: !!itemDia?.bloque,
               estado: asistenciaDia?.marcacionEntrada
                 ? new Date(asistenciaDia?.marcacionEntrada).getTime() >
                   new Date(horarioEntrada).getTime() + 600
@@ -390,32 +398,45 @@ export class AlertaController {
 
       for (const alerta of nuevos) {
         if (!mapa.has(alerta.idUsuario)) {
-          mapa.set(alerta?.get()?.idUsuario, {
-            idUsuario: alerta?.get()?.idUsuario,
+          mapa.set(alerta?.idUsuario, {
+            idUsuario: alerta?.idUsuario,
             nuevos: [],
             historicos: [],
           });
         }
-        mapa.get(alerta?.get()?.idUsuario)!.historicos.push(alerta?.get());
+        mapa.get(alerta?.idUsuario)!.historicos.push(alerta);
       }
 
       for (const alerta of historicos) {
         if (!mapa.has(alerta.idUsuario)) {
-          mapa.set(alerta?.get()?.idUsuario, {
-            idUsuario: alerta?.get()?.idUsuario,
+          mapa.set(alerta?.idUsuario, {
+            idUsuario: alerta?.idUsuario,
             nuevos: [],
             historicos: [],
           });
         }
-        mapa.get(alerta?.get()?.idUsuario)!.historicos.push(alerta?.get());
+        mapa.get(alerta?.idUsuario)!.historicos.push(alerta);
       }
 
       return Array.from(mapa.values());
     };
 
-    const historicos = await this.service.findAllByFecha(fecha);
+    const historicos = (await this.service.findAllHistoric()).map(
+      (item: Alerta) => item.toJSON(),
+    );
 
     const alertas = resultados
+      .map((item: any) => {
+        const { trabajadores, ...data } = item;
+        return {
+          ...data,
+          trabajadores: trabajadores.filter((trabajador) =>
+            trabajador.horarios.some((horario) =>
+              horario.items.some((i) => i.sede.id === item.id),
+            ),
+          ),
+        };
+      })
       .filter((item) =>
         item.trabajadores.some((t) => t.estado === 'no_asistio'),
       )
@@ -435,15 +456,15 @@ export class AlertaController {
       .map((a) => {
         const alerta = historicos.find((al) => {
           return (
-            al?.get()?.idSede == a.idSede &&
-            al?.get()?.idUsuario == a.idUsuario &&
-            al?.get()?.idTrabajador == a.idTrabajador &&
-            new Date(al?.get()?.fechaEntrada).getTime() ==
+            al?.idSede == a.idSede &&
+            al?.idUsuario == a.idUsuario &&
+            al?.idTrabajador == a.idTrabajador &&
+            new Date(al?.fechaEntrada).getTime() ==
               new Date(a.fechaEntrada).getTime()
           );
         });
         return {
-          id: alerta?.get()?.id,
+          id: alerta?.id,
           ...a,
         };
       })
@@ -455,6 +476,6 @@ export class AlertaController {
 
     this.alertaGateway.enviarAlertaRetraso(resultado);
 
-    return true;
+    return { alertas, historicos };
   }
 }

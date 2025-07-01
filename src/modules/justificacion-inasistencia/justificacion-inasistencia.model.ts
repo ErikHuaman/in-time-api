@@ -6,14 +6,24 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   Index,
   Model,
   PrimaryKey,
+  Scopes,
   Table,
 } from 'sequelize-typescript';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['archivo', 'deletedAt'] }, // Excluir campo de eliminación lógica y archivo por defecto
+}))
+@Scopes(() => ({
+  withArchivo: {
+    attributes: { include: ['archivo'] },
+  }, // Devolver archivo para casos especificos
+}))
 @Table({
   tableName: 'justificacionInasistencia',
   paranoid: true,

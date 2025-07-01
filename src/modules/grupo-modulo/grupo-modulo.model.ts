@@ -3,6 +3,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   HasMany,
   Index,
@@ -11,6 +12,9 @@ import {
   Table,
 } from 'sequelize-typescript';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'grupoModulo',
   paranoid: true,

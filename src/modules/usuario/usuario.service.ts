@@ -14,6 +14,20 @@ import { Sede } from '@modules/sede/sede.model';
 import { col, fn, Op, where } from 'sequelize';
 import { PaginatedResponse } from '@common/interfaces/paginated-response.interface';
 import { UsuarioRepository } from './usuario.repository';
+import { Trabajador } from '@modules/trabajador/trabajador.model';
+import { ContactoTrabajador } from '@modules/contacto-trabajador/contacto-trabajador.model';
+import { InfoTrabajador } from '@modules/info-trabajador/info-trabajador.model';
+import { ContratoTrabajador } from '@modules/contrato-trabajador/contrato-trabajador.model';
+import { Cargo } from '@modules/cargo/cargo.model';
+import { HorarioTrabajador } from '@modules/horario-trabajador/horario-trabajador.model';
+import { TurnoTrabajo } from '@modules/turno-trabajo/turno-trabajo.model';
+import { HorarioTrabajadorItem } from '@modules/horario-trabajador-item/horario-trabajador-item.model';
+import { BloqueHoras } from '@modules/bloque-horas/bloque-horas.model';
+import { JustificacionInasistencia } from '@modules/justificacion-inasistencia/justificacion-inasistencia.model';
+import { Asistencia } from '@modules/asistencia/asistencia.model';
+import { CorreccionMarcacion } from '@modules/correccion-marcacion/correccion-marcacion.model';
+import { Vacacion } from '@modules/vacacion/vacacion.model';
+import { PermisoTrabajador } from '@modules/permiso-trabajador/permiso-trabajador.model';
 
 @Injectable()
 export class UsuarioService {
@@ -36,9 +50,6 @@ export class UsuarioService {
             }),
           ],
         }),
-      },
-      attributes: {
-        exclude: ['archivo', 'descriptor', 'password', 'deletedAt'],
       },
       include: [
         {
@@ -63,9 +74,6 @@ export class UsuarioService {
   async findAllFilter(): Promise<Usuario[]> {
     return this.repository.findAll({
       order: [['orden', 'ASC']],
-      attributes: {
-        exclude: ['archivo', 'descriptor', 'password', 'deletedAt'],
-      },
       include: [
         {
           model: Rol,
@@ -88,9 +96,6 @@ export class UsuarioService {
   async findOne(id: string): Promise<Usuario | null> {
     return this.repository.findOne({
       where: { id },
-      attributes: {
-        exclude: ['archivo', 'descriptor', 'password', 'deletedAt'],
-      },
       include: [
         {
           model: Rol,
@@ -128,15 +133,15 @@ export class UsuarioService {
     descriptor?: number[],
   ): Promise<[number, Usuario[]]> {
     try {
-      const exist = await this.repository.findOne({ where: { id } });
-      if (!exist) {
+      const result = await this.repository.findOne({ where: { id } });
+      if (!result) {
         throw new NotFoundException('Usuario no encontrado');
       }
-
+      const exist = result.toJSON();
       if (dto.password) {
         dto.password = bcrypt.hashSync(dto.password as string, 10);
       } else {
-        dto.password = exist.get()?.password; // Mantener la contraseña existente si no se proporciona una nueva
+        dto.password = exist?.password; // Mantener la contraseña existente si no se proporciona una nueva
       }
 
       dto.archivo = archivo;
@@ -167,7 +172,8 @@ export class UsuarioService {
     username: string,
     password: string,
   ): Promise<Usuario | null> {
-    const user = await this.repository.findOne({
+    const data = await this.repository.findOne({
+      scopes: ['withPassword'],
       where: { username },
       include: [
         {
@@ -175,21 +181,21 @@ export class UsuarioService {
         },
       ],
     });
-    if (!user) {
-      return null;
+    if (!data) {
+      throw new BadRequestException(
+        `No se encontró el un usuario vinculado al nombre '${username}'`,
+      );
     }
-    if (!user?.get()?.isActive) {
+    const user = data.toJSON();
+    if (!user?.isActive) {
       throw new BadRequestException('Usuario inactivo');
     }
-    if (!user?.get()?.password) {
+    if (!user?.password) {
       throw new BadRequestException('Usuario sin contraseña');
     }
-    const isValidPassword = await bcrypt.compare(
-      password,
-      user?.get()?.password,
-    );
+    const isValidPassword = await bcrypt.compare(password, user?.password);
     if (isValidPassword) {
-      const { password, ...result } = user.get();
+      const { password, ...result } = user;
       return result as Usuario;
     }
     return null;
@@ -197,24 +203,23 @@ export class UsuarioService {
 
   async obtenerArchivo(id: string) {
     const result = await this.repository.findOne({
+      scopes: ['withArchivo'],
       where: { id },
     });
     if (!result) {
       throw new BadRequestException('No se encontró el registro');
     }
+    const data = result.toJSON();
     return {
-      id: result.get().id,
-      fileName: result.get().archivoNombre,
-      file: result.get().archivo,
+      id: data.id,
+      fileName: data.archivoNombre,
+      file: data.archivo,
     };
   }
 
   async findByDNI(identificacion: string): Promise<any | null> {
-    const usuario = await this.repository.findOne({
+    const result = await this.repository.findOne({
       where: { identificacion, isActive: true },
-      attributes: {
-        exclude: ['archivo'],
-      },
       include: [
         {
           model: Rol,
@@ -222,15 +227,135 @@ export class UsuarioService {
         },
       ],
     });
-    if (usuario) {
-      return {
-        identificacion: identificacion,
-        nombres: `${usuario?.get()?.nombre} ${usuario?.get()?.apellido}`,
-        cargo: usuario?.get()?.rol?.get()?.nombre,
-        tieneRegistro: !!usuario?.get()?.archivoNombre,
-        esTrabajador: false,
-      };
+    if (!result) {
+      throw new BadRequestException('No se encontró el usuario');
     }
-    return null;
+    const data = result.toJSON();
+    return {
+      identificacion: identificacion,
+      nombres: `${data?.nombre} ${data?.apellido}`,
+      cargo: data?.rol?.nombre,
+      tieneRegistro: !!data?.archivoNombre,
+      esTrabajador: false,
+    };
+  }
+
+  findByIdUsuarioAndFecha(date: Date, id: string): Promise<Usuario> {
+    const fecha = new Date(date);
+    return this.repository.findOne({
+      where: { id },
+      order: [['orden', 'ASC']],
+      include: [
+        {
+          model: Sede,
+          through: { attributes: [] },
+          include: [
+            {
+              model: Trabajador,
+              through: { attributes: [] },
+              where: { isActive: true },
+              include: [
+                {
+                  model: ContactoTrabajador,
+                  where: { isActive: true },
+                },
+                {
+                  model: InfoTrabajador,
+                  where: { isActive: true },
+                },
+                {
+                  model: ContratoTrabajador,
+                  where: {
+                    isActive: true,
+                    fechaInicio: {
+                      [Op.lte]: fecha.toISOString().split('T')[0],
+                    },
+                  },
+                  include: [
+                    {
+                      model: Cargo,
+                    },
+                  ],
+                  required: true,
+                },
+                {
+                  model: HorarioTrabajador,
+                  include: [
+                    {
+                      model: TurnoTrabajo,
+                    },
+                    {
+                      model: HorarioTrabajadorItem,
+                      include: [
+                        {
+                          model: BloqueHoras,
+                        },
+                        {
+                          model: JustificacionInasistencia,
+                          where: { isActive: true },
+                          required: false,
+                        },
+                      ],
+                    },
+                  ],
+                  required: true,
+                },
+                {
+                  model: Asistencia,
+                  where: {
+                    fecha: {
+                      [Op.eq]: fecha.toISOString().split('T')[0],
+                    },
+                  },
+                  include: [
+                    {
+                      model: CorreccionMarcacion,
+                      required: false,
+                    },
+                  ],
+                  required: false,
+                },
+                {
+                  model: Vacacion,
+                  where: {
+                    [Op.and]: [
+                      {
+                        fechaInicio: {
+                          [Op.lte]: fecha.toISOString().split('T')[0],
+                        },
+                      },
+                      {
+                        fechaFin: {
+                          [Op.gte]: fecha.toISOString().split('T')[0],
+                        },
+                      },
+                    ],
+                  },
+                  required: false,
+                },
+                {
+                  model: PermisoTrabajador,
+                  where: {
+                    [Op.and]: [
+                      {
+                        fechaInicio: {
+                          [Op.lte]: fecha.toISOString().split('T')[0],
+                        },
+                      },
+                      {
+                        fechaFin: {
+                          [Op.gte]: fecha.toISOString().split('T')[0],
+                        },
+                      },
+                    ],
+                  },
+                  required: false,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
   }
 }

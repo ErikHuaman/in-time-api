@@ -14,6 +14,7 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RolService } from '@modules/rol/rol.service';
 import { AuthDTO } from './auth.dto';
+import { Usuario } from '@modules/usuario/usuario.model';
 
 @Controller('auth')
 export class AuthController {
@@ -31,18 +32,15 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get('profile')
-  getProfile(@CurrentUser() user: any) {
+  getProfile(@CurrentUser() user: Usuario) {
     return user;
   }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('verificarModulo')
-  async verificarModulo(@CurrentUser() user: any, @Body() dto: any) {
-    const modulo = await this.rolService.getModuloByIdRol(
-      user.idRol,
-      dto?.url,
-    );
+  async verificarModulo(@CurrentUser() user: Usuario, @Body() dto: any) {
+    const modulo = await this.rolService.getModuloByIdRol(user.idRol, dto?.url);
     return !!modulo;
   }
 }

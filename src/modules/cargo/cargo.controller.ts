@@ -61,7 +61,6 @@ export class CargoController {
     @Param('id') id: string,
     @Body(ParseJsonPipe) dto: CargoDTO,
   ): Promise<[number, Cargo[]]> {
-    console.log('dto', dto);
     return this.service.update(id, dto);
   }
 

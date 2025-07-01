@@ -4,6 +4,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   HasMany,
@@ -13,6 +14,9 @@ import {
   Table,
 } from 'sequelize-typescript';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'correccionMarcacion',
   paranoid: true,

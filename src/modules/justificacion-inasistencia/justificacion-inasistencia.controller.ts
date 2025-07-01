@@ -21,6 +21,7 @@ import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { Usuario } from '@modules/usuario/usuario.model';
 import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
 import { PaginatedResponse } from '@common/interfaces/paginated-response.interface';
+import { ParseJsonPipe } from '@common/pipes/parse-json.pipe';
 
 @Controller('justificacionInasistencia')
 export class JustificacionInasistenciaController {
@@ -55,7 +56,7 @@ export class JustificacionInasistenciaController {
   @UseInterceptors(FileInterceptor('archivo'))
   create(
     @UploadedFile() file: Express.Multer.File,
-    @Body() dto: JustificacionInasistenciaDTO,
+    @Body('dto', ParseJsonPipe) dto: Partial<JustificacionInasistencia>,
   ): Promise<JustificacionInasistencia | null> {
     return this.service.create(dto, Buffer.from(file.buffer));
   }

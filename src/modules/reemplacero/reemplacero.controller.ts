@@ -12,6 +12,8 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -25,11 +27,13 @@ import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { Usuario } from '@modules/usuario/usuario.model';
 import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
 import { PaginatedResponse } from '@common/interfaces/paginated-response.interface';
+import { ParseJsonPipe } from '@common/pipes/parse-json.pipe';
 
 @Controller('reemplacero')
 export class ReemplaceroController {
   constructor(
     private readonly service: ReemplaceroService,
+    @Inject(forwardRef(() => FaceService))
     private readonly faceService: FaceService,
   ) {}
 
@@ -62,7 +66,7 @@ export class ReemplaceroController {
   @UseInterceptors(FileInterceptor('archivo'))
   async create(
     @UploadedFile() file: Express.Multer.File,
-    @Body() dto: ReemplaceroDTO,
+    @Body('dto', ParseJsonPipe) dto: Partial<Reemplacero>,
   ): Promise<Reemplacero | null> {
     if (file) {
       dto.archivoNombre = file.originalname;
@@ -88,7 +92,7 @@ export class ReemplaceroController {
   async update(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
-    @Body() dto: ReemplaceroDTO,
+    @Body('dto', ParseJsonPipe) dto: Partial<Reemplacero>,
   ): Promise<[number, Reemplacero[]]> {
     if (file) {
       dto.archivoNombre = file.originalname;

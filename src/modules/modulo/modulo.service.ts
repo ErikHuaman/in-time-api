@@ -61,16 +61,22 @@ export class ModuloService {
     });
 
     return modulos.map((modulo) => {
-      const { roles, ...x } = modulo.get();
-      let rol: Rol = roles?.[0];
-      const permisos = new PermisoRol();
-      permisos.get().idRol = idRol;
-      permisos.get().idModulo = modulo.get().id;
+      const { roles, ...x } = modulo.toJSON();
+      let rol = roles?.[0];
+      console.log('rol', rol);
+      const permisos = {
+        idRol,
+        idModulo: modulo.id,
+        leer: false,
+        crear: false,
+        editar: false,
+        eliminar: false,
+      };
       if (rol) {
-        permisos.get().leer = rol.get().PermisoRol.get().leer;
-        permisos.get().crear = rol.get().PermisoRol.get().crear;
-        permisos.get().editar = rol.get().PermisoRol.get().editar;
-        permisos.get().eliminar = rol.get().PermisoRol.get().eliminar;
+        permisos.leer = rol['PermisoRol'].leer;
+        permisos.crear = rol['PermisoRol'].crear;
+        permisos.editar = rol['PermisoRol'].editar;
+        permisos.eliminar = rol['PermisoRol'].eliminar;
       }
 
       return {

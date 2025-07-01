@@ -39,7 +39,6 @@ export class FeriadoService {
     try {
       return this.repository.create({ ...dto });
     } catch (error) {
-      console.log('error', error);
       if (error.name === 'SequelizeUniqueConstraintError') {
         throw new BadRequestException('Ya existe un registro con ese valor');
       }

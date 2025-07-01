@@ -5,15 +5,18 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
-  HasMany,
   Index,
   Model,
   PrimaryKey,
   Table,
 } from 'sequelize-typescript';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'asistenciaUsuarios',
   paranoid: true,
@@ -70,14 +73,14 @@ export class AsistenciaUsuario extends Model {
     allowNull: true,
     type: DataType.DATE,
   })
-  marcacionEntrada: Date;
+  marcacionEntrada: Date | null;
 
   @Column({
     field: 'marcacionSalida',
     allowNull: true,
     type: DataType.DATE,
   })
-  marcacionSalida: Date;
+  marcacionSalida: Date | null;
 
   @Column({
     field: 'latitudEntrada',

@@ -11,6 +11,9 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  Res,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { TrabajadorService } from './trabajador.service';
 import { Trabajador } from './trabajador.model';
@@ -27,11 +30,15 @@ import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FaceService } from '@modules/face/face.service';
 import { ParseJsonPipe } from '@common/pipes/parse-json.pipe';
+import { RegistroBiometricoService } from '@modules/registro-biometrico/registro-biometrico.service';
+import { Response } from 'express';
 
 @Controller('trabajadores')
 export class TrabajadorController {
   constructor(
     private readonly service: TrabajadorService,
+    private readonly biometricoService: RegistroBiometricoService,
+    @Inject(forwardRef(() => FaceService))
     private readonly faceService: FaceService,
   ) {}
 
@@ -42,7 +49,6 @@ export class TrabajadorController {
     @CurrentUser() user: Usuario,
     @Query() query: PaginationQueryDto,
   ): Promise<PaginatedResponse<Trabajador>> {
-    console.log(query.q?.isActive)
     if (!query.q?.isActive) {
       return this.service.findAllInactives(
         user,
@@ -111,7 +117,6 @@ export class TrabajadorController {
     @Param('id') id: string,
     @Body('dto', ParseJsonPipe) dto: Partial<Trabajador>,
   ): Promise<[number, Trabajador[]]> {
-    console.log("dto", dto)
     if (file) {
       let descriptor: Float32Array | null =
         await this.faceService.getDescriptorFromBuffer(file.buffer);
@@ -155,6 +160,20 @@ export class TrabajadorController {
   @Patch('restore/:id')
   restore(@Param('id') id: string): Promise<void> {
     return this.service.restore(id);
+  }
+
+  @Get('obtenerArchivo/:idBiometrico')
+  async obtenerArchivo(
+    @Param('idBiometrico') idBiometrico: string,
+    @Res() res: Response,
+  ) {
+    const archivo = await this.service.obtenerArchivo(idBiometrico);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${archivo.fileName}"`,
+    );
+    res.setHeader('Content-Type', 'application/octet-stream');
+    return res.send(archivo.file);
   }
 
   @ApiBearerAuth()
@@ -228,10 +247,10 @@ export class TrabajadorController {
             salida.setHours(horaSalida, minutoSalida);
 
             const marcacionEntrada = asist
-              ? new Date(asist?.marcacionEntrada)
+              ? new Date(asist?.marcacionEntrada!)
               : null;
             const marcacionSalida = asist
-              ? new Date(asist?.marcacionSalida)
+              ? new Date(asist?.marcacionSalida!)
               : null;
 
             diario = {
@@ -273,8 +292,8 @@ export class TrabajadorController {
             const minutoTotal = totalAsistencia % 60;
             const tardanza =
               totalAsistencia !== 0 && !diaLibre
-                ? (asist?.diferenciaEntrada > 0
-                    ? Math.abs(asist?.diferenciaEntrada)
+                ? (asist?.diferenciaEntrada! > 0
+                    ? Math.abs(asist?.diferenciaEntrada!)
                     : 0) / 60
                 : 0;
             const diff = totalAsistencia - totalHorario;
@@ -377,11 +396,11 @@ export class TrabajadorController {
           .find((a) => a.get().orden === maxCont)
           ?.get();
 
-        const maxAsign = Math.max(...sedes.map((a) => a.get().orden));
-        const asignacion = sedes.find((a) => a.get().orden === maxAsign)?.get();
+        // const maxAsign = Math.max(...sedes.map((a) => a.get().orden));
+        // const asignacion = sedes.find((a) => a.get().orden === maxAsign)?.get();
 
         const cargo = contrato.cargo ? contrato.cargo.get() : undefined;
-        const sede = asignacion.sede ? asignacion.sede.get() : undefined;
+        // const sede = asignacion.sede ? asignacion.sede.get() : undefined;
 
         const diasLaborados = marcaciones.filter(
           (m) => !['-', 'F', 'X', 'V'].includes(m.codigo),
@@ -480,7 +499,7 @@ export class TrabajadorController {
         return {
           ...x,
           cargo,
-          sede,
+          sedes,
           diasLaborados,
           feriados,
           faltas,
@@ -594,10 +613,10 @@ export class TrabajadorController {
             salida.setHours(horaSalida, minutoSalida);
 
             const marcacionEntrada = asist
-              ? new Date(asist?.marcacionEntrada)
+              ? new Date(asist?.marcacionEntrada!)
               : null;
             const marcacionSalida = asist
-              ? new Date(asist?.marcacionSalida)
+              ? new Date(asist?.marcacionSalida!)
               : null;
 
             diario = {
@@ -639,8 +658,8 @@ export class TrabajadorController {
             const minutoTotal = totalAsistencia % 60;
             const tardanza =
               totalAsistencia !== 0 && !diaLibre
-                ? (asist?.diferenciaEntrada > 0
-                    ? Math.abs(asist?.diferenciaEntrada)
+                ? (asist?.diferenciaEntrada! > 0
+                    ? Math.abs(asist?.diferenciaEntrada!)
                     : 0) / 60
                 : 0;
             const diff = totalAsistencia - totalHorario;
@@ -906,10 +925,10 @@ export class TrabajadorController {
             salida.setHours(horaSalida, minutoSalida);
 
             const marcacionEntrada = asist
-              ? new Date(asist?.marcacionEntrada)
+              ? new Date(asist?.marcacionEntrada!)
               : null;
             const marcacionSalida = asist
-              ? new Date(asist?.marcacionSalida)
+              ? new Date(asist?.marcacionSalida!)
               : null;
 
             diario = {
@@ -951,8 +970,8 @@ export class TrabajadorController {
             const minutoTotal = totalAsistencia % 60;
             const tardanza =
               totalAsistencia !== 0 && !diaLibre
-                ? (asist?.diferenciaEntrada > 0
-                    ? Math.abs(asist?.diferenciaEntrada)
+                ? (asist?.diferenciaEntrada! > 0
+                    ? Math.abs(asist?.diferenciaEntrada!)
                     : 0) / 60
                 : 0;
             const diff = totalAsistencia - totalHorario;
@@ -1273,10 +1292,10 @@ export class TrabajadorController {
           salida.setHours(horaSalida, minutoSalida);
 
           const marcacionEntrada = asist
-            ? new Date(asist?.marcacionEntrada)
+            ? new Date(asist?.marcacionEntrada!)
             : null;
           const marcacionSalida = asist
-            ? new Date(asist?.marcacionSalida)
+            ? new Date(asist?.marcacionSalida!)
             : null;
 
           diario = {
@@ -1318,8 +1337,8 @@ export class TrabajadorController {
           const minutoTotal = totalAsistencia % 60;
           const tardanza =
             totalAsistencia !== 0 && !diaLibre
-              ? (asist?.diferenciaEntrada > 0
-                  ? Math.abs(asist?.diferenciaEntrada)
+              ? (asist?.diferenciaEntrada! > 0
+                  ? Math.abs(asist?.diferenciaEntrada!)
                   : 0) / 60
               : 0;
           const diff = totalAsistencia - totalHorario;
@@ -1561,5 +1580,20 @@ export class TrabajadorController {
     } else {
       return null;
     }
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('ComprobantePagoByMonthAndIdTrabajador')
+  async findComprobantePagoByMonthAndIdTrabajador(
+    @Body() dto: { id: string; fecha: Date },
+  ): Promise<any> {
+    if (!dto || !dto.id || !dto.fecha) {
+      throw new BadRequestException(
+        'Los parametros proporcionados no coinciden con los requeridos',
+      );
+    }
+
+    return this.service.getComprobantePago(dto.id, dto.fecha);
   }
 }

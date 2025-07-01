@@ -15,15 +15,11 @@ export class ValidationExceptionFilter implements ExceptionFilter {
     const exceptionResponse = exception.getResponse();
     const message = (exceptionResponse as any)?.message;
 
-    console.log('type: ', typeof message);
-
     // Extrae los mensajes de error
     const originalMessages: string[] =
       typeof message === 'string'
         ? [message]
         : (exceptionResponse as any)?.message || [];
-
-    console.log('originalMessages', originalMessages);
 
     // Mapea y personaliza todos los mensajes
     const messages = originalMessages.map((msg: string) => {

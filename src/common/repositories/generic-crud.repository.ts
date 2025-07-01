@@ -40,9 +40,14 @@ export class GenericCrudRepository<T extends Model> {
     };
   }
 
-  async findOne(options?: FindOptions<T>): Promise<T> {
-    const item = await this.model.findOne({
-      ...options,
+  async findOne(options?: FindOptions<T> & { scopes?: string[] }): Promise<T> {
+    const { scopes = [], ...findOptions } = options || {};
+
+    // Aplica los scopes dinámicamente si están presentes
+    const query = scopes.length > 0 ? this.model.scope(...scopes) : this.model;
+
+    const item = await query.findOne({
+      ...findOptions,
     });
     if (!item) throw new NotFoundException(`${this.model.name} no encontrado`);
     return item as T;
@@ -73,12 +78,11 @@ export class GenericCrudRepository<T extends Model> {
 
   async update(
     id: string,
-    dto: Partial<T>
+    dto: Partial<T>,
   ): Promise<[count: number, rows: T[]]> {
     const [count] = await this.model.update(dto, {
       where: { id },
       returning: true,
-      
     } as UpdateOptions);
 
     const row = await this.model.findOne({ where: { id } } as FindOptions);

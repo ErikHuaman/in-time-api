@@ -3,6 +3,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   HasMany,
@@ -17,6 +18,9 @@ import { HorarioTrabajador } from '@modules/horario-trabajador/horario-trabajado
 import { Trabajador } from '@modules/trabajador/trabajador.model';
 import { CorreccionMarcacion } from '@modules/correccion-marcacion/correccion-marcacion.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'asistencia',
   paranoid: true,
@@ -78,7 +82,7 @@ export class Asistencia extends Model {
     allowNull: true,
     type: DataType.UUID,
   })
-  idHorarioTrabajadorItem: string;
+  idHorarioTrabajadorItem: string | null;
 
   @BelongsTo(() => HorarioTrabajadorItem)
   horarioTrabajadorItem: HorarioTrabajadorItem;
@@ -95,7 +99,7 @@ export class Asistencia extends Model {
     allowNull: true,
     type: DataType.DATE,
   })
-  marcacionEntrada: Date;
+  marcacionEntrada: Date | null;
 
   @Column({
     field: 'diferenciaEntrada',
@@ -103,14 +107,14 @@ export class Asistencia extends Model {
     defaultValue: 0,
     type: DataType.FLOAT,
   })
-  diferenciaEntrada: number;
+  diferenciaEntrada: number | null;
 
   @Column({
     field: 'marcacionSalida',
     allowNull: true,
     type: DataType.DATE,
   })
-  marcacionSalida: Date;
+  marcacionSalida: Date | null;
 
   @Column({
     field: 'diferenciaSalida',
@@ -118,35 +122,35 @@ export class Asistencia extends Model {
     defaultValue: 0,
     type: DataType.FLOAT,
   })
-  diferenciaSalida: number;
+  diferenciaSalida: number | null;
 
   @Column({
     field: 'latitudEntrada',
     allowNull: true,
     type: DataType.STRING,
   })
-  latitudEntrada: string;
+  latitudEntrada: string | null;
 
   @Column({
     field: 'longitudEntrada',
     allowNull: true,
     type: DataType.STRING,
   })
-  longitudEntrada: string;
+  longitudEntrada: string | null;
 
   @Column({
     field: 'latitudSalida',
     allowNull: true,
     type: DataType.STRING,
   })
-  latitudSalida: string;
+  latitudSalida: string | null;
 
   @Column({
     field: 'longitudSalida',
     allowNull: true,
     type: DataType.STRING,
   })
-  longitudSalida: string;
+  longitudSalida: string | null;
 
   @HasMany(() => CorreccionMarcacion, { onDelete: 'CASCADE', hooks: true })
   correcciones: CorreccionMarcacion[];

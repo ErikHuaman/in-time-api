@@ -3,6 +3,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   ForeignKey,
   HasMany,
   Model,
@@ -12,6 +13,9 @@ import {
 import { Pais } from '@modules/localizacion/pais/pais.model';
 import { Provincia } from '@modules/localizacion/provincia/provincia.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'regiones',
   paranoid: true,

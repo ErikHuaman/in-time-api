@@ -3,7 +3,9 @@ import {
   Body,
   Controller,
   Delete,
+  forwardRef,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
@@ -30,6 +32,7 @@ import { ParseJsonPipe } from '@common/pipes/parse-json.pipe';
 export class UsuarioController {
   constructor(
     private readonly service: UsuarioService,
+    @Inject(forwardRef(() => FaceService))
     private readonly faceService: FaceService,
   ) {}
 

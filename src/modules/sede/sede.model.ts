@@ -4,6 +4,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   HasMany,
@@ -19,6 +20,9 @@ import { AsignacionSedeUsuario } from '@modules/asignacion-sede-usuario/asignaci
 import { Trabajador } from '@modules/trabajador/trabajador.model';
 import { Usuario } from '@modules/usuario/usuario.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'sedes',
   paranoid: true,
@@ -100,12 +104,6 @@ export class Sede extends Model {
 
   @BelongsToMany(() => Usuario, () => AsignacionSedeUsuario)
   usuarios: Usuario[];
-
-  // @HasMany(() => AsignacionSede)
-  // asignacion: AsignacionSede[];
-
-  // @HasMany(() => AsignacionSedeUsuario)
-  // asignacionUsuario: AsignacionSedeUsuario[];
 
   @HasMany(() => Dispositivo)
   dispositivos: Dispositivo[];

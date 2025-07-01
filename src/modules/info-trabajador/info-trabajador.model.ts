@@ -3,6 +3,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   Index,
@@ -13,6 +14,9 @@ import {
 import { Ciudad } from '@modules/localizacion/ciudad/ciudad.model';
 import { Trabajador } from '@modules/trabajador/trabajador.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'infoTrabajador',
   paranoid: true,

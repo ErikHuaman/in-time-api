@@ -3,6 +3,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   HasMany,
@@ -14,6 +15,9 @@ import {
 import { PatronHorarioItem } from '@modules/patron-horario-item/patron-horario-item.model';
 import { TipoTurno } from '@modules/tipo-turno/tipo-turno.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'patronHorario',
   paranoid: true,

@@ -3,6 +3,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   Index,
@@ -16,6 +17,9 @@ import { Sede } from '@modules/sede/sede.model';
 import { TiempoContrato } from '@modules/tiempo-contrato/tiempo-contrato.model';
 import { Trabajador } from '@modules/trabajador/trabajador.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'contratoTrabajador',
   paranoid: true,

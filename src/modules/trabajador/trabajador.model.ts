@@ -4,12 +4,14 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   HasMany,
   Index,
   Model,
   PrimaryKey,
+  Scopes,
   Table,
 } from 'sequelize-typescript';
 import { AsignacionSede } from '@modules/asignacion-sede/asignacion-sede.model';
@@ -28,7 +30,11 @@ import { TipoDocIdent } from '@modules/tipo-doc-ident/tipo-doc-ident.model';
 import { Vacacion } from '@modules/vacacion/vacacion.model';
 import { PermisoTrabajador } from '@modules/permiso-trabajador/permiso-trabajador.model';
 import { Sede } from '@modules/sede/sede.model';
+import { Adelanto } from '@modules/adelanto/adelanto.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'trabajador',
   paranoid: true,
@@ -154,6 +160,9 @@ export class Trabajador extends Model {
 
   @HasMany(() => PermisoTrabajador)
   permisos: PermisoTrabajador[];
+
+  @HasMany(() => Adelanto)
+  adelantos: Adelanto[];
 
   @Column({
     field: 'isActive',

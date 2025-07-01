@@ -3,7 +3,6 @@ import { PipeTransform, Injectable, BadRequestException } from '@nestjs/common';
 @Injectable()
 export class ParseJsonPipe implements PipeTransform {
   transform(value: any) {
-    console.log('value', value);
     if (typeof value === 'string') {
       try {
         const parsed = JSON.parse(value, this.nullToUndefined);

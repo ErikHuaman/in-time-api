@@ -116,7 +116,7 @@ export class DispositivoService {
         codigo: dispositivo.codigo,
         nombre: dispositivo.nombre,
         edificio: dispositivo.sede.nombre,
-        ciudad: `${dispositivo.sede.city.name}, ${dispositivo.sede.city.province.name}`,
+        ciudad: `${dispositivo.sede.ciudad.name}, ${dispositivo.sede.ciudad.province.name}`,
       };
     }
     throw new NotFoundException(

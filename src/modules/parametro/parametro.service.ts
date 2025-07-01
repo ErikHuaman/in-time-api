@@ -22,7 +22,6 @@ export class ParametroService {
       const orden = await this.repository.getNextOrderValue();
       return this.repository.create({ ...dto, orden });
     } catch (error) {
-      console.log('error', error);
       if (error.name === 'SequelizeUniqueConstraintError') {
         throw new BadRequestException('Ya existe un registro con ese valor');
       }

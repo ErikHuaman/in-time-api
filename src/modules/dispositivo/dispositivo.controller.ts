@@ -91,14 +91,21 @@ export class DispositivoController {
   async findByDNI(
     @Param('identificacion') identificacion: string,
   ): Promise<any> {
-    const trabajador = await this.serviceTrabajador.findByDNI(identificacion);
-    if (trabajador) {
-      return trabajador;
+    try {
+      const trabajador = await this.serviceTrabajador.findByDNI(identificacion);
+      if (trabajador) {
+        return trabajador;
+      }
+
+      const usuario = await this.usuarioService.findByDNI(identificacion);
+      if (usuario) {
+        return usuario;
+      }
+
+      throw new NotFoundException(`Trabajador no encontrado`);
+    } catch (error) {
+      console.error('Error buscando trabajador o usuario:', error);
+      throw new NotFoundException(`Trabajador no encontrado`);
     }
-    const usuario = await this.usuarioService.findByDNI(identificacion);
-    if (usuario) {
-      return usuario;
-    }
-    throw new NotFoundException(`Trabajador no encontrado`);
   }
 }

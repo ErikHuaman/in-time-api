@@ -55,16 +55,6 @@ export class RegistroBiometricoService {
   }
 
   async obtenerArchivo(id: string) {
-    const result = await this.repository.findOne({
-      where: { id },
-    });
-    if (!result) {
-      throw new BadRequestException('No se encontró el registro');
-    }
-    return {
-      id: result.get().id,
-      fileName: result.get().archivoNombre,
-      file: result.get().archivo,
-    };
+    
   }
 }

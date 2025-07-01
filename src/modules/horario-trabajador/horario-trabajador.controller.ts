@@ -45,7 +45,7 @@ export class HorarioTrabajadorController {
   }
 
   @Post()
-  create(@Body() dto: HorarioTrabajadorDTO): Promise<HorarioTrabajador | null> {
+  create(@Body() dto: Partial<HorarioTrabajador>): Promise<HorarioTrabajador | null> {
     return this.service.create(dto);
   }
 

@@ -41,8 +41,8 @@ export class GrupoModuloController {
 
   @UseGuards(JwtAuthGuard)
   @Get('permisos')
-  findAllPermisos(@CurrentUser() user: any): Promise<GrupoModulo[]> {
-    return this.service.findAllPermisos(user?.get()?.id);
+  findAllPermisos(@CurrentUser() user: Usuario): Promise<GrupoModulo[]> {
+    return this.service.findAllPermisos(user?.id);
   }
 
   @Get(':id')

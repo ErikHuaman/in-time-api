@@ -48,7 +48,10 @@ export class ReemplaceroService {
   ): Promise<[number, Reemplacero[]]> {
     dto.archivo = archivo;
     dto.descriptor = descriptor;
-    return this.repository.update(id, dto);
+    return this.repository.update(id, {
+      ...dto,
+      codigo: !archivo ? undefined : null,
+    });
   }
 
   async changeStatus(
@@ -68,15 +71,17 @@ export class ReemplaceroService {
 
   async obtenerArchivo(id: string) {
     const result = await this.repository.findOne({
+      scopes: ['withArchivo'],
       where: { id },
     });
     if (!result) {
       throw new BadRequestException('No se encontró el registro');
     }
+    const data = result.toJSON();
     return {
-      id: result.get().id,
-      fileName: result.get().archivoNombre,
-      file: result.get().archivo,
+      id: data.id,
+      fileName: data.archivoNombre,
+      file: data.archivo,
     };
   }
 }

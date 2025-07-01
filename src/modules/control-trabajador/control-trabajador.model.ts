@@ -3,6 +3,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   Index,
@@ -12,6 +13,9 @@ import {
 } from 'sequelize-typescript';
 import { Trabajador } from '@modules/trabajador/trabajador.model';
 import { TurnoTrabajo } from '@modules/turno-trabajo/turno-trabajo.model';
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'controlTrabajador',
   paranoid: true,

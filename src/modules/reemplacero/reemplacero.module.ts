@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ReemplaceroController } from './reemplacero.controller';
 import { ReemplaceroService } from './reemplacero.service';
 import { SequelizeModule } from '@nestjs/sequelize';
@@ -7,7 +7,10 @@ import { FaceModule } from '@modules/face/face.module';
 import { ReemplaceroRepository } from './reemplacero.repository';
 
 @Module({
-  imports: [SequelizeModule.forFeature([Reemplacero]), FaceModule],
+  imports: [
+    SequelizeModule.forFeature([Reemplacero]),
+    forwardRef(() => FaceModule),
+  ],
   controllers: [ReemplaceroController],
   providers: [ReemplaceroService, ReemplaceroRepository],
   exports: [ReemplaceroService, ReemplaceroRepository],

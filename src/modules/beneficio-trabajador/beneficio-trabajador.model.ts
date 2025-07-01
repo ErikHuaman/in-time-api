@@ -3,6 +3,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   Index,
@@ -14,6 +15,9 @@ import { Trabajador } from '@modules/trabajador/trabajador.model';
 import { FondoPensiones } from '@modules/fondo-pensiones/fondo-pensiones.model';
 import { SeguroSalud } from '@modules/seguro-salud/seguro-salud.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'beneficioTrabajador',
   paranoid: true,

@@ -2,12 +2,16 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   Index,
   Model,
   PrimaryKey,
   Table,
 } from 'sequelize-typescript';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'estadoCivil',
   paranoid: true,

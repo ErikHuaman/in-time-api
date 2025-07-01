@@ -363,9 +363,11 @@ export class FaceService implements OnModuleInit {
   ): Promise<any> {
     const fechaAsistencia = new Date(dto.fecha);
 
-    const usuario = await this.modelUsuario.findOne({
+    console.log('fechaAsistencia', fechaAsistencia);
+
+    const result = await this.modelUsuario.findOne({
       attributes: {
-        exclude: ['archivo'],
+        include: ['descriptor'],
       },
       include: [
         {
@@ -376,23 +378,20 @@ export class FaceService implements OnModuleInit {
           },
           include: [
             {
-              model: Sede,
-              include: [
-                {
-                  model: Dispositivo,
-                },
-              ],
+              model: Dispositivo,
             },
           ],
         },
       ],
     });
 
-    if (!usuario) {
+    if (!result) {
       throw new NotFoundException('Usuario no encontrado');
     }
 
-    if (!usuario?.get()?.archivoNombre) {
+    const usuario = result?.toJSON();
+
+    if (!usuario?.archivoNombre) {
       throw new NotFoundException('Registro biometrico no encontrado');
     }
 
@@ -437,7 +436,11 @@ export class FaceService implements OnModuleInit {
       }
     }
 
-    const descriptorReferencia = new Float32Array(usuario.get().descriptor);
+    if (!usuario.descriptor) {
+      throw new NotFoundException('No se encontró el descriptor de referencia');
+    }
+
+    const descriptorReferencia = new Float32Array(usuario.descriptor);
     const descriptorSubida = await this.getDescriptorFromBuffer(imageBuffer);
 
     if (!descriptorReferencia) {
@@ -458,7 +461,7 @@ export class FaceService implements OnModuleInit {
       if (dto.tipo == 'entrada') {
         await this.modelAsistenciaUsuario.create({
           idDispositivo: dto.idDispositivo,
-          idUsuario: usuario?.get()?.id,
+          idUsuario: usuario?.id,
           fecha: fecha,
           marcacionEntrada: dto.tipo === 'entrada' ? fechaAsistencia : null,
           orden,
@@ -473,7 +476,7 @@ export class FaceService implements OnModuleInit {
         });
       }
       return {
-        message: `Hola ${usuario?.get()?.nombre} ${usuario?.get()?.apellido}, se marcó correctamente tu ${dto.tipo}`,
+        message: `Hola ${usuario?.nombre} ${usuario?.apellido}, se marcó correctamente tu ${dto.tipo}`,
         distance,
       };
     }

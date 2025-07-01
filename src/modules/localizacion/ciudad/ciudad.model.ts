@@ -3,6 +3,7 @@ import {
   Column,
   DataType,
   Default,
+  DefaultScope,
   ForeignKey,
   Model,
   PrimaryKey,
@@ -10,6 +11,9 @@ import {
 } from 'sequelize-typescript';
 import { Provincia } from '@modules/localizacion/provincia/provincia.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'ciudades',
   paranoid: true,

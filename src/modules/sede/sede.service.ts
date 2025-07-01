@@ -182,6 +182,7 @@ export class SedeService {
 
   findByFecha(date: Date): Promise<Sede[]> {
     const fecha = new Date(date);
+    const dia = fecha.getDay();
     return this.repository.findAll({
       include: [
         {
@@ -228,7 +229,11 @@ export class SedeService {
                 },
                 {
                   model: HorarioTrabajadorItem,
+                  where: { numDia: dia },
                   include: [
+                    {
+                      model: Sede,
+                    },
                     {
                       model: BloqueHoras,
                     },
@@ -241,6 +246,7 @@ export class SedeService {
                       required: false,
                     },
                   ],
+                  required: true
                 },
               ],
               required: true,

@@ -1,17 +1,24 @@
 import {
-  BelongsTo,
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
-  ForeignKey,
-  HasMany,
   Index,
   Model,
   PrimaryKey,
+  Scopes,
   Table,
 } from 'sequelize-typescript';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['archivo', 'descriptor', 'deletedAt'] }, // Excluir campo de eliminación lógica, archivo y descriptor por defecto
+}))
+@Scopes(() => ({
+  withArchivo: {
+    attributes: { include: ['archivo'] },
+  }, // Devolver archivo para casos especificos
+}))
 @Table({
   tableName: 'reemplacero',
   paranoid: true,
@@ -53,7 +60,7 @@ export class Reemplacero extends Model {
     allowNull: true,
     type: DataType.STRING,
   })
-  codigo: string;
+  codigo: string | null;
 
   @Column({
     field: 'archivo',

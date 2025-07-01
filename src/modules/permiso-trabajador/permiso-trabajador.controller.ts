@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '@core/auth/jwt.guard';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { Usuario } from '@modules/usuario/usuario.model';
 import { PaginationQueryDto } from '@common/dto/pagination-query.dto';
+import { ParseJsonPipe } from '@common/pipes/parse-json.pipe';
 
 @Controller('permisosTrabajador')
 export class PermisoTrabajadorController {
@@ -55,7 +56,7 @@ export class PermisoTrabajadorController {
   @UseInterceptors(FileInterceptor('archivo'))
   create(
     @UploadedFile() file: Express.Multer.File,
-    @Body() dto: PermisoTrabajadorDTO,
+    @Body('dto', ParseJsonPipe) dto: Partial<PermisoTrabajador>,
   ): Promise<PermisoTrabajador | null> {
     return this.service.create(dto, Buffer.from(file.buffer));
   }

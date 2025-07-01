@@ -44,6 +44,8 @@ export class AsistenciaUsuarioService {
     // Último día del mes
     const ultimoDia = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0);
 
+    
+
     return this.repository.findAll({
       where: {
         fecha: {
@@ -56,9 +58,6 @@ export class AsistenciaUsuarioService {
       include: [
         {
           model: Usuario,
-          attributes: {
-            exclude: ['password', 'archivo', 'archivoNombre', 'descriptor'],
-          },
           include: [
             {
               model: Rol,

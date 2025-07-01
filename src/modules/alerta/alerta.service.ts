@@ -34,6 +34,13 @@ export class AlertaService {
     });
   }
 
+  async findAllHistoric(): Promise<Alerta[]> {
+    return this.repository.findAll({
+      order: [['orden', 'DESC']],
+    });
+
+  }
+
   async findAllByFecha(fecha: Date): Promise<Alerta[]> {
     return this.repository.findAll({
       where: { fecha },

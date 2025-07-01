@@ -1,11 +1,9 @@
-import { Sede } from '@modules/sede/sede.model';
-import { Trabajador } from '@modules/trabajador/trabajador.model';
-import { Usuario } from '@modules/usuario/usuario.model';
 import {
   BelongsTo,
   Column,
   DataType,
   Default,
+  DefaultScope,
   DeletedAt,
   ForeignKey,
   HasMany,
@@ -14,7 +12,13 @@ import {
   PrimaryKey,
   Table,
 } from 'sequelize-typescript';
+import { Sede } from '@modules/sede/sede.model';
+import { Trabajador } from '@modules/trabajador/trabajador.model';
+import { Usuario } from '@modules/usuario/usuario.model';
 
+@DefaultScope(() => ({
+  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+}))
 @Table({
   tableName: 'alertas',
   paranoid: true,
