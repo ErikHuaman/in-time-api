@@ -67,13 +67,13 @@ export class UsuarioService {
       ],
       limit,
       offset,
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 
   async findAllFilter(): Promise<Usuario[]> {
     return this.repository.findAll({
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
       include: [
         {
           model: Rol,
@@ -244,7 +244,7 @@ export class UsuarioService {
     const fecha = new Date(date);
     return this.repository.findOne({
       where: { id },
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
       include: [
         {
           model: Sede,

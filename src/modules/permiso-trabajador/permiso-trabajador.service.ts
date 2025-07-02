@@ -43,7 +43,7 @@ export class PermisoTrabajadorService {
       ],
       limit,
       offset,
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 

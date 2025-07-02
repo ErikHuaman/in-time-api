@@ -50,7 +50,7 @@ export class ReemplazoHorarioService {
       ],
       limit,
       offset,
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 

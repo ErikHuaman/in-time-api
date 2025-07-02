@@ -48,7 +48,7 @@ export class RolService {
       },
       limit,
       offset,
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 

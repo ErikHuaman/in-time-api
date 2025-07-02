@@ -14,9 +14,9 @@ import {
 import { Sede } from '@modules/sede/sede.model';
 import { Trabajador } from '@modules/trabajador/trabajador.model';
 
-@DefaultScope(() => ({
-  attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
-}))
+// @DefaultScope(() => ({
+//   attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
+// }))
 @Table({
   tableName: 'asignacionSede',
   paranoid: true,

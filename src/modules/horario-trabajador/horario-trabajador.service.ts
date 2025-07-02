@@ -72,7 +72,7 @@ export class HorarioTrabajadorService {
       ],
       limit,
       offset,
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 

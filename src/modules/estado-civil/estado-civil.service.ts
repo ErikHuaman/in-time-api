@@ -19,7 +19,7 @@ export class EstadoCivilService {
   ): Promise<PaginatedResponse<EstadoCivil>> {
     const searchTerm = (search || '').toLowerCase();
     return this.repository.findAndCountAll({
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 

@@ -114,6 +114,7 @@ export class TrabajadorService {
     offset: number,
     filter?: boolean,
     search?: string,
+    isAsigned: boolean = false
   ): Promise<PaginatedResponse<Trabajador>> {
     const searchTerm = (search || '').toLowerCase();
     let whereCondition: any = { isActive: true };
@@ -161,12 +162,12 @@ export class TrabajadorService {
           model: Sede,
           through: { attributes: [] },
           where: { isActive: true },
-          required: false,
+          required: isAsigned,
         },
         { model: ControlTrabajador, where: { isActive: true } },
       ],
       order: [
-        ['orden', 'ASC'],
+        ['orden', 'DESC'],
         [{ model: ContratoTrabajador, as: 'contratos' }, 'orden', 'DESC'],
         [{ model: Sede, as: 'sedes' }, 'orden', 'DESC'],
       ],
@@ -552,13 +553,39 @@ export class TrabajadorService {
       }
 
       if (sedes && sedes?.length) {
-        for (const sede of sedes) {
-          await this.asignacionRepository.create({
+        const securedDtoList = await Promise.all(
+          sedes.map((sede, i) => ({
             idTrabajador: id,
             idSede: sede.id,
             fechaAsignacion: (sede as any).AsignacionSede.fechaAsignacion,
-          });
-        }
+          })),
+        );
+
+        await this.asignacionRepository.bulkDestroy({
+          where: {
+            idTrabajador: id,
+            idSede: {
+              [Op.notIn]: sedes.map((dto) => dto.id),
+            },
+          },
+        });
+
+        await this.asignacionRepository.bulkCreate(
+          securedDtoList,
+          {
+            updateOnDuplicate: ['fechaAsignacion'],
+            individualHooks: true,
+            ignoreDuplicates: true,
+          },
+          {
+            where: {
+              idTrabajador: id,
+              idSede: {
+                [Op.in]: sedes.map((dto) => dto.id),
+              },
+            },
+          },
+        );
       }
 
       return this.repository.update(id, trabajador);
@@ -578,8 +605,7 @@ export class TrabajadorService {
     return this.repository.update(id, { isActive });
   }
 
-  async delete(id: string, force: boolean): Promise<void> {
-    const trabajador = await this.repository.findOne({ where: { id } });
+  async delete(id: string): Promise<void> {
     await this.repository.delete(id);
   }
 

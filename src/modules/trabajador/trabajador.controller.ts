@@ -49,6 +49,7 @@ export class TrabajadorController {
     @CurrentUser() user: Usuario,
     @Query() query: PaginationQueryDto,
   ): Promise<PaginatedResponse<Trabajador>> {
+    console.log("query.q?.isAsigned", query.q?.isAsigned);
     if (!query.q?.isActive) {
       return this.service.findAllInactives(
         user,
@@ -64,6 +65,7 @@ export class TrabajadorController {
         query.offset!,
         query.q?.filter,
         query.q?.search,
+        query.q?.isAsigned,
       );
     }
   }
@@ -147,12 +149,9 @@ export class TrabajadorController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @Delete(':id/:force')
-  delete(
-    @Param('id') id: string,
-    @Param('force') force: boolean,
-  ): Promise<void> {
-    return this.service.delete(id, force);
+  @Delete(':id')
+  delete(@Param('id') id: string): Promise<void> {
+    return this.service.delete(id);
   }
 
   @ApiBearerAuth()

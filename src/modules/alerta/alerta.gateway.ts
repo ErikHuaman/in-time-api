@@ -20,10 +20,11 @@ export class AlertaGateway {
 
   enviarAlertaRetraso(alertas: AgrupadoPorUsuario[]) {
     alertas.forEach((alerta: AgrupadoPorUsuario) => {
-      // if (alerta.nuevos.length) {
+      if (alerta.nuevos.length) {
         const url = `alerta_retraso/${alerta.idUsuario}`;
+        console.log('url', url);
         this.server.emit(url, alerta);
-      // }
+      }
     });
   }
 }

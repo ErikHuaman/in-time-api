@@ -19,7 +19,7 @@ export class FrecuenciaPagoService {
   ): Promise<PaginatedResponse<FrecuenciaPago>> {
     const searchTerm = (search || '').toLowerCase();
     return this.repository.findAndCountAll({
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 

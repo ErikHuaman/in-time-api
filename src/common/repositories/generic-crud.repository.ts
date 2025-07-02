@@ -64,12 +64,9 @@ export class GenericCrudRepository<T extends Model> {
     restoreOpts?: FindOptions<T>,
   ): Promise<T[]> {
     if (restoreOpts) {
-      const restoreAll = await this.model.findAll({
-        ...options,
-        paranoid: true,
-      } as FindOptions);
-
-      await Promise.all(restoreAll.map((res) => res.restore()));
+      await this.model.restore({
+        ...restoreOpts,
+      });
     }
 
     const items = await this.model.bulkCreate(dtos, options);

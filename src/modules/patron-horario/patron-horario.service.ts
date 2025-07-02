@@ -35,7 +35,7 @@ export class PatronHorarioService {
           required: true,
         },
       ],
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 

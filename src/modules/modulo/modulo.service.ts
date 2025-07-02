@@ -38,7 +38,7 @@ export class ModuloService {
       ],
       limit,
       offset,
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 
@@ -57,7 +57,7 @@ export class ModuloService {
         },
       ],
       raw: false,
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
 
     return modulos.map((modulo) => {

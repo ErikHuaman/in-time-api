@@ -43,7 +43,7 @@ export class AdelantoService {
           required: true,
         },
       ],
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 

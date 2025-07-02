@@ -23,7 +23,7 @@ export class FondoPensionesService {
   ): Promise<PaginatedResponse<FondoPensiones>> {
     const searchTerm = (search || '').toLowerCase();
     return this.repository.findAndCountAll({
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 

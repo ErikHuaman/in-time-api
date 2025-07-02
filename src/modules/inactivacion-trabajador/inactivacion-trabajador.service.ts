@@ -32,7 +32,7 @@ export class InactivacionTrabajadorService {
       ],
       limit,
       offset,
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 

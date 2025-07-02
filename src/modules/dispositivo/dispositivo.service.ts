@@ -28,7 +28,7 @@ export class DispositivoService {
   ): Promise<PaginatedResponse<Dispositivo>> {
     const searchTerm = (search || '').toLowerCase();
     return this.repository.findAndCountAll({
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
       include: [
         {
           model: Sede,

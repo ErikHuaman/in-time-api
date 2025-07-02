@@ -41,7 +41,7 @@ export class AsignacionSedeUsuarioService {
   async findAllByUsuario(idUsuario: string): Promise<AsignacionSedeUsuario[]> {
     return this.repository.findAll({
       where: { idUsuario },
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
       include: [
         {
           model: Sede,
@@ -104,7 +104,7 @@ export class AsignacionSedeUsuarioService {
     const fecha = new Date(date);
     return this.repository.findAll({
       where: { idUsuario },
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
       include: [
         {
           model: Sede,

@@ -25,7 +25,7 @@ export class AsistenciaService {
     return this.repository.findAndCountAll({
       limit,
       offset,
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
       include: [{ model: Trabajador }],
     });
   }

@@ -26,7 +26,7 @@ export class BloqueHorasService {
     return this.repository.findAndCountAll({
       limit,
       offset,
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
     });
   }
 

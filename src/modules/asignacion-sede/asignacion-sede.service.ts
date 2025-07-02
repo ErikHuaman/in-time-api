@@ -25,7 +25,7 @@ export class AsignacionSedeService {
   async findAllByTrabajador(idTrabajador: string): Promise<AsignacionSede[]> {
     return this.repository.findAll({
       where: { idTrabajador },
-      order: [['orden', 'ASC']],
+      order: [['orden', 'DESC']],
       include: [
         {
           model: Sede,

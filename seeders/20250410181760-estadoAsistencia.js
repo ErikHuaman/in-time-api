@@ -101,6 +101,7 @@ module.exports = {
           codigo: 'OB',
           bgColor: '#fca604',
           textColor: '#0f172a',
+          isActive: true,
           createdAt: new Date('2025-04-10T18:31:19.000Z'),
           updatedAt: new Date('2025-04-10T18:31:19.000Z'),
         },
