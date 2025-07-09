@@ -1,1 +1,0 @@
-import{Gb as t,Hb as n,ac as p,hb as a}from"./chunk-VDH5VFWZ.js";import"./chunk-EQDQRRRY.js";var m=class o{static \u0275fac=function(e){return new(e||o)};static \u0275cmp=a({type:o,selectors:[["app-pago-reemplazos"]],decls:2,vars:0,template:function(e,l){e&1&&(t(0,"p"),p(1,"pago-reemplazos works!"),n())},encapsulation:2})};export{m as PagoReemplazosComponent};

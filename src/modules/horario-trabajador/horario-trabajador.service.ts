@@ -34,9 +34,11 @@ export class HorarioTrabajadorService {
   ): Promise<PaginatedResponse<HorarioTrabajador>> {
     const searchTerm = (search || '').toLowerCase();
     return this.repository.findAndCountAll({
+      where: { isActive: true },
       include: [
         {
           model: Trabajador,
+          where: { isActive: true },
           include: [
             {
               model: ContratoTrabajador,
@@ -62,6 +64,8 @@ export class HorarioTrabajadorService {
           include: [
             {
               model: BloqueHoras,
+              where: { isActive: true },
+              required: false,
             },
             {
               model: Sede,
@@ -88,6 +92,16 @@ export class HorarioTrabajadorService {
     try {
       const orden = await this.repository.getNextOrderValue();
       const itemOrden = await this.itemRepository.getNextOrderValue();
+
+      await this.repository.updateOther(
+        { isActive: false },
+        {
+          where: {
+            idTrabajador: dto.idTrabajador,
+          },
+        },
+      );
+
       return this.repository.create(
         {
           ...dto,

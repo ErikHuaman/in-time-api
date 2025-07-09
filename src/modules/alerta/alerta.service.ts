@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
@@ -10,7 +11,9 @@ import { PaginatedResponse } from '@common/interfaces/paginated-response.interfa
 
 @Injectable()
 export class AlertaService {
-  constructor(private readonly repository: AlertaRepository) {}
+  constructor(
+    private readonly repository: AlertaRepository,
+  ) {}
 
   async findAll(
     user: Usuario,
@@ -38,7 +41,6 @@ export class AlertaService {
     return this.repository.findAll({
       order: [['orden', 'DESC']],
     });
-
   }
 
   async findAllByFecha(fecha: Date): Promise<Alerta[]> {

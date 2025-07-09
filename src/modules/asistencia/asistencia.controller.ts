@@ -21,9 +21,6 @@ import { Trabajador } from '@modules/trabajador/trabajador.model';
 import { HorarioTrabajador } from '@modules/horario-trabajador/horario-trabajador.model';
 import { HorarioTrabajadorItem } from '@modules/horario-trabajador-item/horario-trabajador-item.model';
 import { JustificacionInasistencia } from '@modules/justificacion-inasistencia/justificacion-inasistencia.model';
-import { AsignacionSedeUsuarioService } from '@modules/asignacion-sede-usuario/asignacion-sede-usuario.service';
-import { AsignacionSedeUsuario } from '@modules/asignacion-sede-usuario/asignacion-sede-usuario.model';
-import { AsignacionSede } from '@modules/asignacion-sede/asignacion-sede.model';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { PdfService } from '@core/pdf/pdf.service';
@@ -60,6 +57,8 @@ export class AsistenciaController {
     );
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Get('testMail')
   async testMail(): Promise<any> {
     const users = [{ email: 'erik.huaman@bartech.pe', name: 'Erik' }];
@@ -81,16 +80,22 @@ export class AsistenciaController {
     return true;
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   findOne(@Param('id') id: string): Promise<Asistencia | null> {
     return this.service.findOne(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post()
   create(@Body() dto: AsistenciaDTO): Promise<Asistencia | null> {
     return this.service.create(dto);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -99,6 +104,8 @@ export class AsistenciaController {
     return this.service.update(id, dto);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Get('changeStatus/:id/:isActive')
   changeStatus(
     @Param('id') id: string,
@@ -107,16 +114,21 @@ export class AsistenciaController {
     return this.service.changeStatus(id, isActive);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   delete(@Param('id') id: string): Promise<void> {
     return this.service.delete(id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch('restore/:id')
   restore(@Param('id') id: string): Promise<void> {
     return this.service.restore(id);
   }
 
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Post('ByMonth')
   async findAllByMonth(
@@ -136,8 +148,12 @@ export class AsistenciaController {
     let asistido = 0;
     const listAsistencia = trabajadores.map((t: Trabajador) => {
       const horario: HorarioTrabajador = t.horarios[0];
-      const vacacion = t.vacaciones[0];
+      const vacaciones = t.vacaciones;
+      const inactivaciones = t.inactivaciones;
       const permiso = t.permisos;
+
+      const maxCont = Math.max(...t.contratos.map((a) => a.orden));
+      const contrato = t.contratos.find((a) => a.orden === maxCont);
       const now = new Date();
       const marcaciones = diasMes.map((d) => {
         const asist: Asistencia = t.asistencias
@@ -269,51 +285,87 @@ export class AsistenciaController {
             asistido = 0;
           }
 
-          let newCodigo =
-            marcacionEntrada && !marcacionSalida
-              ? 'OB'
-              : totalAsistencia == 0 && !diaLibre
-                ? diaDescanso
-                  ? asistido > 1
-                    ? 'F'
-                    : diario.codigo
-                  : 'F'
-                : totalAsistencia != 0 &&
-                    Math.abs(totalAsistencia - totalHorario) > 10
-                  ? diaDescanso
-                    ? 'DD'
-                    : 'OB'
-                  : diario.codigo;
+          let newCodigo = '';
 
-          if (vacacion) {
-            const vacInicio = new Date(vacacion.fechaInicio);
-            vacInicio.setHours(0, 0, 0);
-            const vacFin = new Date(vacacion.fechaFin);
-            vacFin.setHours(23, 59, 59);
-            const fechaTime = new Date(d.fecha).getTime();
-            if (
-              vacInicio.getTime() <= fechaTime &&
-              fechaTime <= vacFin.getTime()
-            ) {
+          const fechaTime = new Date(d.fecha).getTime();
+
+          // 1. Verificar si la fecha es antes del contrato
+          if (contrato) {
+            const conInicio = new Date(contrato.fechaInicio);
+            conInicio.setHours(0, 0, 0);
+            if (fechaTime < conInicio.getTime()) {
+              newCodigo = '-';
+            }
+          }
+
+          // 2. Verificar vacaciones
+          if (vacaciones?.length && newCodigo === '') {
+            const estaDeVacaciones = vacaciones.some((vac) => {
+              const inicio = new Date(vac.fechaInicio);
+              inicio.setHours(0, 0, 0);
+              const fin = new Date(vac.fechaFin);
+              fin.setHours(23, 59, 59);
+              return (
+                inicio.getTime() <= fechaTime && fechaTime <= fin.getTime()
+              );
+            });
+
+            if (estaDeVacaciones) {
               newCodigo = 'V';
             }
           }
 
-          if (permiso && newCodigo != 'V') {
-            const perm = permiso.find((p) => {
-              const pInicio = new Date(p.fechaInicio);
-              pInicio.setHours(0, 0, 0);
-              const pFin = new Date(p.fechaFin);
-              pFin.setHours(23, 59, 59);
-              const fechaTime = new Date(d.fecha).getTime();
+          // 3. Verificar suspensión (solo si no está en vacaciones ni fuera de contrato)
+          if (inactivaciones?.length && newCodigo === '') {
+            const estaSuspendido = inactivaciones.some((susp) => {
+              const inicio = new Date(susp.fechaInicio);
+              inicio.setHours(0, 0, 0);
+              const fin = new Date(susp.fechaFin);
+              fin.setHours(23, 59, 59);
               return (
-                pInicio.getTime() <= fechaTime && fechaTime <= pFin.getTime()
+                inicio.getTime() <= fechaTime && fechaTime <= fin.getTime()
               );
             });
-            if (perm) {
+
+            if (estaSuspendido) {
+              newCodigo = 'S';
+            }
+          }
+
+          // 4. Verificar permisos (solo si no está en vacaciones ni suspensión ni fuera de contrato)
+          if (permiso?.length && newCodigo === '') {
+            const tienePermiso = permiso.some((p) => {
+              const inicio = new Date(p.fechaInicio);
+              inicio.setHours(0, 0, 0);
+              const fin = new Date(p.fechaFin);
+              fin.setHours(23, 59, 59);
+              return (
+                inicio.getTime() <= fechaTime && fechaTime <= fin.getTime()
+              );
+            });
+
+            if (tienePermiso) {
               newCodigo = 'P';
             }
           }
+
+          newCodigo =
+            newCodigo === ''
+              ? marcacionEntrada && !marcacionSalida
+                ? 'OB'
+                : totalAsistencia == 0 && !diaLibre
+                  ? diaDescanso
+                    ? asistido > 1
+                      ? 'F'
+                      : diario.codigo
+                    : 'F'
+                  : totalAsistencia != 0 &&
+                      Math.abs(totalAsistencia - totalHorario) > 10
+                    ? diaDescanso
+                      ? 'DD'
+                      : 'OB'
+                    : diario.codigo
+              : newCodigo;
 
           diario = {
             ...diario,
@@ -332,6 +384,7 @@ export class AsistenciaController {
             codigo: newCodigo,
             horaTotal,
             minutoTotal,
+            sede: item?.sede,
           };
         }
         return {
@@ -345,13 +398,7 @@ export class AsistenciaController {
       });
       const { contratos, sedes, asistencias, horarios, ...x } = t;
 
-      const maxCont = Math.max(...contratos.map((a) => a.orden));
-      const contrato = contratos.find((a) => a.orden === maxCont);
-      // const maxAsign = Math.max(...sedes.map((a) => a.orden));
-      // const asignacion = sedes.find((a) => a.orden === maxAsign);
-
       const cargo = contrato?.cargo;
-      // const sede = asignacion.sede ? asignacion.sede : undefined;
       const diasLaborados = marcaciones.filter(
         (m) => !['-', 'F', 'X', 'DD'].includes(m.codigo),
       ).length;
@@ -362,7 +409,7 @@ export class AsistenciaController {
       const permisos = marcaciones.filter((m) =>
         ['P'].includes(m.codigo),
       ).length;
-      const vacaciones = marcaciones.filter((m) =>
+      const vacacionesNum = marcaciones.filter((m) =>
         ['V'].includes(m.codigo),
       ).length;
       const descansos = marcaciones.filter((m) =>
@@ -404,7 +451,7 @@ export class AsistenciaController {
         tardanzas,
         retiros,
         sobretiempos,
-        vacaciones,
+        vacaciones: vacacionesNum,
         permisos,
         descansos,
         totalDias,
@@ -437,6 +484,8 @@ export class AsistenciaController {
     };
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('ObservadoByMonth')
   async findAllObservadoByMonth(
     @CurrentUser() user: Usuario,
@@ -447,11 +496,6 @@ export class AsistenciaController {
         'Los parametros proporcionados no coinciden con los requeridos',
       );
     }
-    const codigos = {
-      1: 'D',
-      2: 'N',
-      3: 'A',
-    };
     const diasMes = getDiasDelMes(dto.fecha);
     const trabajadores = (
       await this.trabajadorService.findAllByMonth(dto.fecha, user?.id)
@@ -459,7 +503,13 @@ export class AsistenciaController {
     let asistido = 0;
     const listAsistencia = trabajadores.map((t: Trabajador) => {
       const horario: HorarioTrabajador = t.horarios[0];
-      const vacacion = t.vacaciones[0];
+      const vacaciones = t.vacaciones;
+      const inactivaciones = t.inactivaciones;
+      const permiso = t.permisos;
+
+      const maxCont = Math.max(...t.contratos.map((a) => a.orden));
+      const contrato = t.contratos.find((a) => a.orden === maxCont);
+
       const now = new Date();
       const marcaciones = diasMes.map((d) => {
         const asist: Asistencia = t.asistencias
@@ -484,6 +534,8 @@ export class AsistenciaController {
           const item: HorarioTrabajadorItem = horario.items.find(
             (h: HorarioTrabajadorItem) => h.numDia === d.diaSemana,
           )!;
+
+          console.log("item", item.sede)
 
           diaLibre = d.fecha.getTime() > now.getTime() || item.diaLibre;
 
@@ -517,7 +569,7 @@ export class AsistenciaController {
             codigo: !diaLibre
               ? item?.diaDescanso
                 ? 'X'
-                : codigos[horario.turno?.orden]
+                : horario.turno?.codigo
               : '-',
             horario: {
               diaLibre,
@@ -581,35 +633,87 @@ export class AsistenciaController {
             asistido = 0;
           }
 
-          let newCodigo =
-            marcacionEntrada && !marcacionSalida
-              ? 'OB'
-              : totalAsistencia == 0 && !diaLibre
-                ? diaDescanso
-                  ? asistido > 1
-                    ? 'F'
-                    : diario.codigo
-                  : 'F'
-                : totalAsistencia != 0 &&
-                    Math.abs(totalAsistencia - totalHorario) > 10
-                  ? diaDescanso
-                    ? 'DD'
-                    : 'OB'
-                  : diario.codigo;
+          let newCodigo = '';
 
-          if (vacacion) {
-            const vacInicio = new Date(vacacion.fechaInicio);
-            vacInicio.setHours(0, 0, 0);
-            const vacFin = new Date(vacacion.fechaFin);
-            vacFin.setHours(23, 59, 59);
-            const fechaTime = new Date(d.fecha).getTime();
-            if (
-              vacInicio.getTime() <= fechaTime &&
-              fechaTime <= vacFin.getTime()
-            ) {
+          const fechaTime = new Date(d.fecha).getTime();
+
+          // 1. Verificar si la fecha es antes del contrato
+          if (contrato) {
+            const conInicio = new Date(contrato.fechaInicio);
+            conInicio.setHours(0, 0, 0);
+            if (fechaTime < conInicio.getTime()) {
+              newCodigo = '-';
+            }
+          }
+
+          // 2. Verificar vacaciones
+          if (vacaciones?.length && newCodigo === '') {
+            const estaDeVacaciones = vacaciones.some((vac) => {
+              const inicio = new Date(vac.fechaInicio);
+              inicio.setHours(0, 0, 0);
+              const fin = new Date(vac.fechaFin);
+              fin.setHours(23, 59, 59);
+              return (
+                inicio.getTime() <= fechaTime && fechaTime <= fin.getTime()
+              );
+            });
+
+            if (estaDeVacaciones) {
               newCodigo = 'V';
             }
           }
+
+          // 3. Verificar suspensión (solo si no está en vacaciones ni fuera de contrato)
+          if (inactivaciones?.length && newCodigo === '') {
+            const estaSuspendido = inactivaciones.some((susp) => {
+              const inicio = new Date(susp.fechaInicio);
+              inicio.setHours(0, 0, 0);
+              const fin = new Date(susp.fechaFin);
+              fin.setHours(23, 59, 59);
+              return (
+                inicio.getTime() <= fechaTime && fechaTime <= fin.getTime()
+              );
+            });
+
+            if (estaSuspendido) {
+              newCodigo = 'S';
+            }
+          }
+
+          // 4. Verificar permisos (solo si no está en vacaciones ni suspensión ni fuera de contrato)
+          if (permiso?.length && newCodigo === '') {
+            const tienePermiso = permiso.some((p) => {
+              const inicio = new Date(p.fechaInicio);
+              inicio.setHours(0, 0, 0);
+              const fin = new Date(p.fechaFin);
+              fin.setHours(23, 59, 59);
+              return (
+                inicio.getTime() <= fechaTime && fechaTime <= fin.getTime()
+              );
+            });
+
+            if (tienePermiso) {
+              newCodigo = 'P';
+            }
+          }
+
+          newCodigo =
+            newCodigo === ''
+              ? marcacionEntrada && !marcacionSalida
+                ? 'OB'
+                : totalAsistencia == 0 && !diaLibre
+                  ? diaDescanso
+                    ? asistido > 1
+                      ? 'F'
+                      : diario.codigo
+                    : 'F'
+                  : totalAsistencia != 0 &&
+                      Math.abs(totalAsistencia - totalHorario) > 10
+                    ? diaDescanso
+                      ? 'DD'
+                      : 'OB'
+                    : diario.codigo
+              : newCodigo;
 
           diario = {
             ...diario,
@@ -628,6 +732,7 @@ export class AsistenciaController {
             codigo: newCodigo,
             horaTotal,
             minutoTotal,
+            sede: item?.sede,
           };
         }
         return {
@@ -642,13 +747,7 @@ export class AsistenciaController {
       });
       const { contratos, sedes, asistencias, horarios, ...x } = t;
 
-      const maxCont = Math.max(...contratos.map((a) => a.orden));
-      const contrato = contratos.find((a) => a.orden === maxCont);
-      // const maxAsign = Math.max(...sedes.map((a) => a.orden));
-      // const asignacion = sedes.find((a) => a.orden === maxAsign);
-
       const cargo = contrato?.cargo;
-      // const sede = asignacion.sede ? asignacion.sede : undefined;
       const diasLaborados = marcaciones.filter(
         (m) => !['-', 'F', 'X', 'DD'].includes(m.codigo),
       ).length;
@@ -659,7 +758,7 @@ export class AsistenciaController {
       const permisos = marcaciones.filter((m) =>
         ['P'].includes(m.codigo),
       ).length;
-      const vacaciones = marcaciones.filter((m) =>
+      const vacacionesNum = marcaciones.filter((m) =>
         ['V'].includes(m.codigo),
       ).length;
       const descansos = marcaciones.filter((m) =>
@@ -701,7 +800,7 @@ export class AsistenciaController {
         tardanzas,
         retiros,
         sobretiempos,
-        vacaciones,
+        vacaciones: vacacionesNum,
         permisos,
         descansos,
         totalDias,
@@ -735,25 +834,32 @@ export class AsistenciaController {
         'Los parametros proporcionados no coinciden con los requeridos',
       );
     }
-    const codigos = {
-      1: 'D',
-      2: 'N',
-      3: 'A',
-    };
+
     const diasMes = getDiasDelMes(dto.fecha);
     const trabajadores = (
       await this.trabajadorService.findAllByMonth(dto.fecha, user?.id)
     ).map((t: Trabajador) => t.toJSON());
+    let asistido = 0;
     const listAsistencia = trabajadores.map((t: Trabajador) => {
       const horario: HorarioTrabajador = t.horarios[0];
 
-      const vacacion = t.vacaciones[0];
+      const vacaciones = t.vacaciones;
+      const inactivaciones = t.inactivaciones;
+      const permiso = t.permisos;
+
+      const maxCont = Math.max(...t.contratos.map((a) => a.orden));
+      const contrato = t.contratos.find((a) => a.orden === maxCont);
+
       const now = new Date();
       const marcaciones = diasMes.map((d) => {
-        const asist = t.asistencias.find((a: Asistencia) => {
-          const fecha = new Date(a.fecha);
-          return d.fecha.getTime() === fecha.getTime() && a.isActive;
-        });
+        const asist: Asistencia = t.asistencias
+          .map((a: Asistencia) => a)
+          .find((a: Asistencia) => {
+            const fecha = new Date(a.fecha);
+            return d.fecha.getTime() === fecha.getTime();
+          })!;
+
+        const correccion = (asist?.correcciones ?? [])[0];
 
         let diaLibre = false;
 
@@ -761,68 +867,237 @@ export class AsistenciaController {
 
         let diario;
 
+        let totalHorario = 0;
+        let totalAsistencia = 0;
+
         if (horario) {
           const item = horario.items.find((h) => h.numDia === d.diaSemana)!;
 
-          const justificacion = item?.justificaciones.find(
-            (j) => new Date(j.fecha).getTime() === new Date(d.fecha).getTime(),
+          diaLibre = d.fecha.getTime() > now.getTime() || !!item?.diaLibre;
+
+          diaDescanso = !diaLibre && !!item?.diaDescanso;
+
+          const justificacion = item?.justificaciones
+            .map((j) => j)
+            .find(
+              (j: JustificacionInasistencia) =>
+                new Date(j.fecha).getTime() === new Date(d.fecha).getTime(),
+            );
+
+          const noBloque = !item?.bloque ? true : false;
+
+          const horaEntrada = item?.bloque?.horaEntrada ?? 0;
+          const minutoEntrada = item?.bloque?.minutoEntrada ?? 0;
+
+          const entrada = new Date(d.fecha);
+          entrada.setHours(horaEntrada, minutoEntrada);
+
+          const horaSalida = item?.bloque?.horaSalida ?? 0;
+          const minutoSalida = item?.bloque?.minutoSalida ?? 0;
+
+          const salida = new Date(d.fecha);
+          salida.setDate(
+            horaSalida < horaEntrada ? salida.getDate() + 1 : salida.getDate(),
           );
+          salida.setHours(horaSalida, minutoSalida);
 
-          diaLibre = d.fecha.getTime() > now.getTime() || item.diaLibre;
-
-          diaDescanso = !diaLibre && item.diaDescanso;
+          const marcacionEntrada = correccion
+            ? correccion?.marcacionEntrada
+            : asist?.marcacionEntrada
+              ? new Date(asist?.marcacionEntrada)
+              : null;
+          const marcacionSalida = correccion
+            ? correccion?.marcacionSalida
+            : asist?.marcacionSalida
+              ? new Date(asist?.marcacionSalida)
+              : null;
 
           diario = {
             codigo: !diaLibre
               ? item?.diaDescanso
                 ? 'X'
-                : codigos[horario.turno?.orden]
+                : horario.turno?.codigo
               : '-',
+            turno: horario?.turno,
             idHorarioTrabajador: horario?.id,
             idHorarioTrabajadorItem: item?.id,
-            justificacion: justificacion,
+            horario: {
+              diaLibre,
+              diaDescanso,
+              entrada: !noBloque ? entrada : null,
+              salida: !noBloque ? salida : null,
+            },
+            asistencia: {
+              diaLibre,
+              diaDescanso,
+              marcacionEntrada,
+              marcacionSalida,
+              latitudEntrada: asist?.latitudEntrada,
+              longitudEntrada: asist?.longitudEntrada,
+              latitudSalida: asist?.latitudSalida,
+              longitudSalida: asist?.longitudSalida,
+            },
+            corregido: !!correccion,
+            justificado: !!justificacion,
           };
 
-          let newCodigo =
-            !diaLibre && !diaDescanso && !asist ? 'F' : diario.codigo;
+          const diffMsHor =
+            salida && entrada ? salida.getTime() - entrada.getTime() : 0;
 
-          if (vacacion) {
-            const vacInicio = new Date(vacacion.fechaInicio);
-            vacInicio.setHours(0, 0, 0);
-            const vacFin = new Date(vacacion.fechaFin);
-            vacFin.setHours(23, 59, 59);
-            const fechaTime = new Date(d.fecha).getTime();
-            if (
-              vacInicio.getTime() <= fechaTime &&
-              fechaTime <= vacFin.getTime()
-            ) {
+          totalHorario = Math.floor(diffMsHor / 1000 / 60) ?? 0;
+
+          const diffMs =
+            marcacionSalida && marcacionEntrada
+              ? marcacionSalida.getTime() -
+                (marcacionEntrada.getTime() < entrada.getTime()
+                  ? entrada.getTime()
+                  : marcacionEntrada.getTime())
+              : 0;
+
+          totalAsistencia = Math.floor(diffMs / 1000 / 60);
+
+          const horaTotal = Math.floor(totalAsistencia / 60);
+          const minutoTotal = totalAsistencia % 60;
+          const tardanza =
+            totalAsistencia !== 0 && !diaLibre
+              ? (asist?.diferenciaEntrada! > 0
+                  ? Math.abs(asist?.diferenciaEntrada!)
+                  : 0) / 60
+              : 0;
+          const diff = totalAsistencia - totalHorario;
+          const sobretiempo =
+            totalAsistencia !== 0 && !diaLibre
+              ? diff > 0
+                ? Math.abs(diff)
+                : 0
+              : 0;
+          const retiro =
+            totalAsistencia !== 0 && !diaLibre
+              ? diff < 0
+                ? Math.abs(diff)
+                : 0
+              : 0;
+
+          if (totalAsistencia == 0) {
+            asistido++;
+          } else {
+            asistido = 0;
+          }
+
+          let newCodigo = '';
+
+          const fechaTime = new Date(d.fecha).getTime();
+
+          // 1. Verificar si la fecha es antes del contrato
+          if (contrato) {
+            const conInicio = new Date(contrato.fechaInicio);
+            conInicio.setHours(0, 0, 0);
+            if (fechaTime < conInicio.getTime()) {
+              newCodigo = '-';
+            }
+          }
+
+          // 2. Verificar vacaciones
+          if (vacaciones?.length && newCodigo === '') {
+            const estaDeVacaciones = vacaciones.some((vac) => {
+              const inicio = new Date(vac.fechaInicio);
+              inicio.setHours(0, 0, 0);
+              const fin = new Date(vac.fechaFin);
+              fin.setHours(23, 59, 59);
+              return (
+                inicio.getTime() <= fechaTime && fechaTime <= fin.getTime()
+              );
+            });
+
+            if (estaDeVacaciones) {
               newCodigo = 'V';
             }
           }
 
+          // 3. Verificar suspensión (solo si no está en vacaciones ni fuera de contrato)
+          if (inactivaciones?.length && newCodigo === '') {
+            const estaSuspendido = inactivaciones.some((susp) => {
+              const inicio = new Date(susp.fechaInicio);
+              inicio.setHours(0, 0, 0);
+              const fin = new Date(susp.fechaFin);
+              fin.setHours(23, 59, 59);
+              return (
+                inicio.getTime() <= fechaTime && fechaTime <= fin.getTime()
+              );
+            });
+
+            if (estaSuspendido) {
+              newCodigo = 'S';
+            }
+          }
+
+          // 4. Verificar permisos (solo si no está en vacaciones ni suspensión ni fuera de contrato)
+          if (permiso?.length && newCodigo === '') {
+            const tienePermiso = permiso.some((p) => {
+              const inicio = new Date(p.fechaInicio);
+              inicio.setHours(0, 0, 0);
+              const fin = new Date(p.fechaFin);
+              fin.setHours(23, 59, 59);
+              return (
+                inicio.getTime() <= fechaTime && fechaTime <= fin.getTime()
+              );
+            });
+
+            if (tienePermiso) {
+              newCodigo = 'P';
+            }
+          }
+
+          newCodigo =
+            newCodigo === ''
+              ? marcacionEntrada && !marcacionSalida
+                ? 'OB'
+                : totalAsistencia == 0 && !diaLibre
+                  ? diaDescanso
+                    ? asistido > 1
+                      ? 'F'
+                      : diario.codigo
+                    : 'F'
+                  : totalAsistencia != 0 &&
+                      Math.abs(totalAsistencia - totalHorario) > 10
+                    ? diaDescanso
+                      ? 'DD'
+                      : 'OB'
+                    : diario.codigo
+              : newCodigo;
+
           diario = {
             ...diario,
+            tardanza: {
+              hora: tardanza > 0 ? Math.floor(tardanza / 60) : 0,
+              minuto: tardanza > 0 ? tardanza % 60 : 0,
+            },
+            sobretiempo: {
+              hora: sobretiempo > 0 ? Math.floor(sobretiempo / 60) : 0,
+              minuto: sobretiempo > 0 ? sobretiempo % 60 : 0,
+            },
+            retiro: {
+              hora: retiro > 0 ? Math.floor(retiro / 60) : 0,
+              minuto: retiro > 0 ? retiro % 60 : 0,
+            },
             codigo: newCodigo,
+            horaTotal,
+            minutoTotal,
             sede: item?.sede,
           };
         }
         return {
-          corrected: !!diario?.justificacion,
           dia: d.dia,
           numDia: d.diaSemana,
           fecha: d.fecha,
           ...diario,
+          totalAsistencia,
+          totalHorario,
         };
       });
-      const { contratos, asistencias, horarios, ...x } = t;
-
-      const maxCont = Math.max(...contratos.map((a) => a.orden));
-      const contrato = contratos.find((a) => a.orden === maxCont);
-      // const maxAsign = Math.max(...sedes.map((a) => a.orden));
-      // const asignacion = sedes.find((a) => a.orden === maxAsign);
+      const { contratos, sedes, asistencias, horarios, ...x } = t;
 
       const cargo = contrato?.cargo;
-      // const sede = /* asignacion.sede ? asignacion.sede : */ undefined;
 
       return {
         trabajador: x,
@@ -848,6 +1123,7 @@ export class AsistenciaController {
     @Body() dto: { fecha: Date },
     @CurrentUser() user: Usuario,
   ): Promise<any> {
+    console.log('BySupervisorAndDate');
     if (!dto || !dto.fecha) {
       throw new BadRequestException(
         'Los parametros proporcionados no coinciden con los requeridos',
@@ -855,13 +1131,13 @@ export class AsistenciaController {
     }
 
     const diaMes = getDia(dto.fecha);
-    const usuario = (await this.usuarioService.findByIdUsuarioAndFecha(
-      diaMes.fecha,
-      user?.id,
-    )).toJSON();
 
-    return usuario
-      .sedes.map((a: Sede) => {
+    const usuario = (
+      await this.usuarioService.findByIdUsuarioAndFecha(diaMes.fecha, user?.id)
+    ).toJSON();
+
+    return usuario.sedes
+      .map((a: Sede) => {
         const { trabajadores, ...sede } = a;
         return {
           ...sede,

@@ -49,7 +49,6 @@ export class TrabajadorController {
     @CurrentUser() user: Usuario,
     @Query() query: PaginationQueryDto,
   ): Promise<PaginatedResponse<Trabajador>> {
-    console.log("query.q?.isAsigned", query.q?.isAsigned);
     if (!query.q?.isActive) {
       return this.service.findAllInactives(
         user,
@@ -86,15 +85,23 @@ export class TrabajadorController {
     @Body('dto', ParseJsonPipe) dto: Partial<Trabajador>,
   ): Promise<Trabajador | null> {
     if (file) {
-      let descriptor: Float32Array | null =
-        await this.faceService.getDescriptorFromBuffer(file.buffer);
-      if (!descriptor) {
-        throw new BadRequestException('No se detectó rostro en la imagen');
+      const resFace = await this.faceService.getDescriptorFromBuffer(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+      );
+
+      if (!resFace.descriptor) {
+        throw new BadRequestException(resFace.msg);
       }
+
+      let descriptor: Float32Array = resFace.descriptor;
+
       return this.service.create(
         dto,
         Buffer.from(file.buffer),
         file.originalname,
+        file.mimetype,
         Array.from(descriptor),
       );
     } else {
@@ -120,16 +127,23 @@ export class TrabajadorController {
     @Body('dto', ParseJsonPipe) dto: Partial<Trabajador>,
   ): Promise<[number, Trabajador[]]> {
     if (file) {
-      let descriptor: Float32Array | null =
-        await this.faceService.getDescriptorFromBuffer(file.buffer);
-      if (!descriptor) {
-        throw new BadRequestException('No se detectó rostro en la imagen');
+      const resFace = await this.faceService.getDescriptorFromBuffer(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+      );
+
+      if (!resFace.descriptor) {
+        throw new BadRequestException(resFace.msg);
       }
+
+      let descriptor: Float32Array = resFace.descriptor;
       return this.service.update(
         id,
         dto,
         Buffer.from(file.buffer),
         file.originalname,
+        file.mimetype,
         Array.from(descriptor),
       );
     } else {
@@ -169,9 +183,9 @@ export class TrabajadorController {
     const archivo = await this.service.obtenerArchivo(idBiometrico);
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${archivo.fileName}"`,
+      `attachment; filename="${archivo.filename}"`,
     );
-    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Type', archivo.mimetype);
     return res.send(archivo.file);
   }
 
@@ -543,6 +557,7 @@ export class TrabajadorController {
   @UseGuards(JwtAuthGuard)
   @Post('PagoByMonthDescanseros')
   async findAllPagoByMonthDescanseros(
+    @CurrentUser() user: Usuario,
     @Body() dto: { fecha: Date },
   ): Promise<any[]> {
     if (!dto || !dto.fecha) {
@@ -550,305 +565,298 @@ export class TrabajadorController {
         'Los parametros proporcionados no coinciden con los requeridos',
       );
     }
-    const codigos = {
-      1: 'D',
-      2: 'N',
-      3: 'A',
-    };
-    const trabajadores = await this.service.findAllByMonthDescanseros(
-      dto.fecha,
-    );
-    return trabajadores
-      .map((t) => t.get())
-      .map((t) => {
-        const horario = t.horarios[0].get();
-        const now = new Date();
-        const diasMes = getDiasDelMes(dto.fecha);
-        let asistido = 0;
 
-        const marcaciones = diasMes.map((d) => {
-          const asist: Asistencia = t.asistencias
-            .map((a: Asistencia) => a.get())
-            .find((a: Asistencia) => {
-              const fecha = new Date(a.fecha);
-              return d.fecha.getTime() === fecha.getTime();
-            });
+    const trabajadores = (
+      await this.service.findAllByMonthDescanseros(dto.fecha, user?.id)
+    ).map((t: Trabajador) => t.toJSON());
+    return trabajadores.map((t) => {
+      const horario = t.horarios[0];
+      const now = new Date();
+      const diasMes = getDiasDelMes(dto.fecha);
+      let asistido = 0;
 
-          let diaLibre = false;
+      const marcaciones = diasMes.map((d) => {
+        const asist: Asistencia = t.asistencias
+          .map((a: Asistencia) => a)
+          .find((a: Asistencia) => {
+            const fecha = new Date(a.fecha);
+            return d.fecha.getTime() === fecha.getTime();
+          });
 
-          let diaDescanso = false;
+        let diaLibre = false;
 
-          let diario;
+        let diaDescanso = false;
 
-          let totalHorario = 0;
-          let totalAsistencia = 0;
+        let diario;
 
-          if (horario) {
-            const item: HorarioTrabajadorItem = horario.items
-              .map((h: HorarioTrabajadorItem) => h.get())
-              .find((h: HorarioTrabajadorItem) => h.numDia === d.diaSemana);
+        let totalHorario = 0;
+        let totalAsistencia = 0;
 
-            diaLibre = d.fecha.getTime() > now.getTime() || item.diaLibre;
+        if (horario) {
+          const item: HorarioTrabajadorItem = horario.items
+            .map((h: HorarioTrabajadorItem) => h)
+            .find((h: HorarioTrabajadorItem) => h.numDia === d.diaSemana);
 
-            diaDescanso = !diaLibre && item.diaDescanso;
+          diaLibre = d.fecha.getTime() > now.getTime() || item.diaLibre;
 
-            const noBloque = item?.bloque ? true : false;
+          diaDescanso = !diaLibre && item.diaDescanso;
 
-            const horaEntrada = item.bloque?.get()?.horaEntrada ?? 0;
-            const minutoEntrada = item.bloque?.get()?.minutoEntrada ?? 0;
+          const noBloque = item?.bloque ? true : false;
 
-            const entrada = new Date(d.fecha);
-            entrada.setHours(horaEntrada, minutoEntrada);
+          const horaEntrada = item.bloque?.horaEntrada ?? 0;
+          const minutoEntrada = item.bloque?.minutoEntrada ?? 0;
 
-            const horaSalida = item.bloque?.get()?.horaSalida ?? 0;
-            const minutoSalida = item.bloque?.get()?.minutoSalida ?? 0;
+          const entrada = new Date(d.fecha);
+          entrada.setHours(horaEntrada, minutoEntrada);
 
-            const salida = new Date(d.fecha);
-            salida.setDate(
-              horaSalida < horaEntrada
-                ? salida.getDate() + 1
-                : salida.getDate(),
-            );
-            salida.setHours(horaSalida, minutoSalida);
+          const horaSalida = item.bloque?.horaSalida ?? 0;
+          const minutoSalida = item.bloque?.minutoSalida ?? 0;
 
-            const marcacionEntrada = asist
-              ? new Date(asist?.marcacionEntrada!)
-              : null;
-            const marcacionSalida = asist
-              ? new Date(asist?.marcacionSalida!)
-              : null;
+          const salida = new Date(d.fecha);
+          salida.setDate(
+            horaSalida < horaEntrada ? salida.getDate() + 1 : salida.getDate(),
+          );
+          salida.setHours(horaSalida, minutoSalida);
 
-            diario = {
-              codigo: !diaLibre
-                ? item?.diaDescanso
-                  ? 'X'
-                  : codigos[horario.turno.get()?.orden]
-                : '-',
-              horario: {
-                diaLibre,
-                diaDescanso,
-                entrada: noBloque ? entrada : null,
-                salida: noBloque ? salida : null,
-              },
-              asistencia: {
-                diaLibre,
-                diaDescanso,
-                marcacionEntrada,
-                marcacionSalida,
-              },
-            };
+          const marcacionEntrada = asist
+            ? new Date(asist?.marcacionEntrada!)
+            : null;
+          const marcacionSalida = asist
+            ? new Date(asist?.marcacionSalida!)
+            : null;
 
-            const diffMsHor =
-              salida && entrada ? salida.getTime() - entrada.getTime() : 0;
-
-            totalHorario = Math.floor(diffMsHor / 1000 / 60) ?? 0;
-
-            const diffMs =
-              marcacionSalida && marcacionEntrada
-                ? marcacionSalida.getTime() -
-                  (marcacionEntrada.getTime() < entrada.getTime()
-                    ? entrada.getTime()
-                    : marcacionEntrada.getTime())
-                : 0;
-
-            totalAsistencia = Math.floor(diffMs / 1000 / 60);
-
-            const horaTotal = Math.floor(totalAsistencia / 60);
-            const minutoTotal = totalAsistencia % 60;
-            const tardanza =
-              totalAsistencia !== 0 && !diaLibre
-                ? (asist?.diferenciaEntrada! > 0
-                    ? Math.abs(asist?.diferenciaEntrada!)
-                    : 0) / 60
-                : 0;
-            const diff = totalAsistencia - totalHorario;
-            const sobretiempo =
-              totalAsistencia !== 0 && !diaLibre
-                ? diff > 0
-                  ? Math.abs(diff)
-                  : 0
-                : 0;
-            const retiro =
-              totalAsistencia !== 0 && !diaLibre
-                ? diff < 0
-                  ? Math.abs(diff)
-                  : 0
-                : 0;
-
-            if (totalAsistencia == 0) {
-              asistido++;
-            } else {
-              asistido = 0;
-            }
-
-            let newCodigo =
-              totalAsistencia == 0 && !diaLibre
-                ? diaDescanso
-                  ? asistido > 1
-                    ? 'F'
-                    : diario.codigo
-                  : 'F'
-                : totalAsistencia != 0 &&
-                    Math.abs(totalAsistencia - totalHorario) > 10
-                  ? diaDescanso
-                    ? 'DD'
-                    : 'OB'
-                  : diario.codigo;
-
-            diario = {
-              ...diario,
-              tardanza: {
-                hora: tardanza > 0 ? Math.floor(tardanza / 60) : 0,
-                minuto: tardanza > 0 ? tardanza % 60 : 0,
-              },
-              sobretiempo: {
-                hora: sobretiempo > 0 ? Math.floor(sobretiempo / 60) : 0,
-                minuto: sobretiempo > 0 ? sobretiempo % 60 : 0,
-              },
-              retiro: {
-                hora: retiro > 0 ? Math.floor(retiro / 60) : 0,
-                minuto: retiro > 0 ? retiro % 60 : 0,
-              },
-              codigo: newCodigo,
-              horaTotal,
-              minutoTotal,
-            };
-          }
-          return {
-            dia: d.dia,
-            numDia: d.diaSemana,
-            fecha: d.fecha,
-            ...diario,
-            totalAsistencia,
-            totalHorario,
+          diario = {
+            codigo: !diaLibre
+              ? item?.diaDescanso
+                ? 'X'
+                : horario.turno?.codigo
+              : '-',
+            horario: {
+              diaLibre,
+              diaDescanso,
+              entrada: noBloque ? entrada : null,
+              salida: noBloque ? salida : null,
+            },
+            asistencia: {
+              diaLibre,
+              diaDescanso,
+              marcacionEntrada,
+              marcacionSalida,
+            },
           };
-        });
 
-        const { contratos, sedes, asistencias, horarios, ...x } = t;
+          const diffMsHor =
+            salida && entrada ? salida.getTime() - entrada.getTime() : 0;
 
-        const maxCont = Math.max(...contratos.map((a) => a.get().orden));
-        const contrato = contratos
-          .find((a) => a.get().orden === maxCont)
-          ?.get();
+          totalHorario = Math.floor(diffMsHor / 1000 / 60) ?? 0;
 
-        const maxAsign = Math.max(...sedes.map((a) => a.get().orden));
-        const asignacion = sedes.find((a) => a.get().orden === maxAsign)?.get();
+          const diffMs =
+            marcacionSalida && marcacionEntrada
+              ? marcacionSalida.getTime() -
+                (marcacionEntrada.getTime() < entrada.getTime()
+                  ? entrada.getTime()
+                  : marcacionEntrada.getTime())
+              : 0;
 
-        const cargo = contrato.cargo ? contrato.cargo.get() : undefined;
-        const sede = asignacion.sede ? asignacion.sede.get() : undefined;
+          totalAsistencia = Math.floor(diffMs / 1000 / 60);
 
-        const diasLaborados = marcaciones.filter(
-          (m) => !['-', 'F', 'X', 'V'].includes(m.codigo),
-        ).length;
-        const feriados = marcaciones.filter((m) =>
-          ['AA'].includes(m.codigo),
-        ).length;
-        const faltas = marcaciones.filter((m) =>
-          ['F'].includes(m.codigo),
-        ).length;
-        const permisos = marcaciones.filter((m) =>
-          ['P'].includes(m.codigo),
-        ).length;
-        const descansos = marcaciones.filter((m) =>
-          ['X'].includes(m.codigo),
-        ).length;
+          const horaTotal = Math.floor(totalAsistencia / 60);
+          const minutoTotal = totalAsistencia % 60;
+          const tardanza =
+            totalAsistencia !== 0 && !diaLibre
+              ? (asist?.diferenciaEntrada! > 0
+                  ? Math.abs(asist?.diferenciaEntrada!)
+                  : 0) / 60
+              : 0;
+          const diff = totalAsistencia - totalHorario;
+          const sobretiempo =
+            totalAsistencia !== 0 && !diaLibre
+              ? diff > 0
+                ? Math.abs(diff)
+                : 0
+              : 0;
+          const retiro =
+            totalAsistencia !== 0 && !diaLibre
+              ? diff < 0
+                ? Math.abs(diff)
+                : 0
+              : 0;
 
-        const totalDias = marcaciones.filter(
-          (m) => !['-', 'V'].includes(m.codigo),
-        ).length;
+          if (totalAsistencia == 0) {
+            asistido++;
+          } else {
+            asistido = 0;
+          }
 
-        const totalDiasVacaciones = marcaciones.filter((m) =>
-          ['V'].includes(m.codigo),
-        ).length;
+          let newCodigo =
+            totalAsistencia == 0 && !diaLibre
+              ? diaDescanso
+                ? asistido > 1
+                  ? 'F'
+                  : diario.codigo
+                : 'F'
+              : totalAsistencia != 0 &&
+                  Math.abs(totalAsistencia - totalHorario) > 10
+                ? diaDescanso
+                  ? 'DD'
+                  : 'OB'
+                : diario.codigo;
 
-        const horasDiarias = contrato.horasContrato;
-        const horasSemanales =
-          horario.items.filter((h) => !h.diaLibre && !h.diaDescanso).length *
-          horasDiarias;
-        const horasMensuales = diasLaborados * horasDiarias;
-        const horasOrdinarias = horasDiarias > 8 ? 8 : horasDiarias;
-        const horasExtra = horasDiarias > 8 ? horasDiarias - 8 : 0;
-
-        const totalDiasMes = diasMes.length;
-
-        const salarioDiario = contrato.salarioMensual;
-
-        const salarioHora = parseFloat((salarioDiario / 8).toFixed(2));
-
-        const horasExtra25 = horasExtra > 2 ? horasExtra - 2 : horasExtra;
-
-        const horasExtra35 = horasExtra - horasExtra25;
-
-        const salarioHoraExtra25 = parseFloat((salarioHora * 1.25).toFixed(2));
-
-        const salarioHoraExtra35 = parseFloat((salarioHora * 1.35).toFixed(2));
-
-        const salarioHoraTotal =
-          salarioHora + salarioHoraExtra25 + salarioHoraExtra35;
-
-        const salarioDiarioExtra25 = horasExtra25 * salarioHoraExtra25;
-
-        const salarioDiarioExtra35 = horasExtra35 * salarioHoraExtra35;
-
-        const salarioDiarioTotal =
-          salarioDiario + salarioDiarioExtra25 + salarioDiarioExtra35;
-
-        const salarioMesExtra25 = salarioDiarioExtra25 * diasLaborados;
-
-        const salarioMesExtra35 = salarioDiarioExtra35 * diasLaborados;
-
-        const descuentoFaltas = parseFloat((faltas * salarioDiario).toFixed(2));
-
-        const salarioVacaciones = parseFloat(
-          (totalDiasVacaciones * salarioDiario).toFixed(2),
-        );
-
-        const salarioMensual = parseFloat(
-          (salarioDiario * diasLaborados).toFixed(2),
-        );
-
-        const salarioMensualTotal =
-          salarioMensual + salarioMesExtra25 + salarioMesExtra35;
-
-        const sueldoBruto = salarioMensualTotal;
-
-        const pagoNeto = sueldoBruto;
-
+          diario = {
+            ...diario,
+            tardanza: {
+              hora: tardanza > 0 ? Math.floor(tardanza / 60) : 0,
+              minuto: tardanza > 0 ? tardanza % 60 : 0,
+            },
+            sobretiempo: {
+              hora: sobretiempo > 0 ? Math.floor(sobretiempo / 60) : 0,
+              minuto: sobretiempo > 0 ? sobretiempo % 60 : 0,
+            },
+            retiro: {
+              hora: retiro > 0 ? Math.floor(retiro / 60) : 0,
+              minuto: retiro > 0 ? retiro % 60 : 0,
+            },
+            codigo: newCodigo,
+            horaTotal,
+            minutoTotal,
+            sede: item?.sede,
+          };
+        }
         return {
-          ...x,
-          cargo,
-          sede,
-          diasLaborados,
-          feriados,
-          faltas,
-          permisos,
-          descansos,
-          totalDias,
-          horasDiarias,
-          horasSemanales,
-          horasMensuales,
-          horasOrdinarias,
-          totalDiasMes,
-          salarioDiario,
-          salarioHora,
-          horasExtra25,
-          horasExtra35,
-          salarioHoraExtra25,
-          salarioHoraExtra35,
-          salarioHoraTotal,
-          salarioDiarioExtra25,
-          salarioDiarioExtra35,
-          salarioDiarioTotal,
-          salarioMensual,
-          salarioMesExtra25,
-          salarioMesExtra35,
-          sueldoBruto,
-          descuentoFaltas,
-          totalDiasVacaciones,
-          salarioVacaciones,
-          pagoNeto,
+          dia: d.dia,
+          numDia: d.diaSemana,
+          fecha: d.fecha,
+          ...diario,
+          totalAsistencia,
+          totalHorario,
         };
       });
+
+      const { contratos, sistencias, horarios, ...x } = t;
+
+      const maxCont = Math.max(...contratos.map((a) => a.orden));
+      const contrato = contratos.find((a) => a.orden === maxCont);
+
+      const cargo = contrato.cargo ? contrato.cargo : undefined;
+
+      const diasLaborados = marcaciones.filter(
+        (m) => !['-', 'F', 'X', 'V'].includes(m.codigo),
+      ).length;
+      const feriados = marcaciones.filter((m) =>
+        ['AA'].includes(m.codigo),
+      ).length;
+      const faltas = marcaciones.filter((m) => ['F'].includes(m.codigo)).length;
+      const permisos = marcaciones.filter((m) =>
+        ['P'].includes(m.codigo),
+      ).length;
+      const descansos = marcaciones.filter((m) =>
+        ['X'].includes(m.codigo),
+      ).length;
+
+      const totalDias = marcaciones.filter(
+        (m) => !['-', 'V'].includes(m.codigo),
+      ).length;
+
+      const totalDiasVacaciones = marcaciones.filter((m) =>
+        ['V'].includes(m.codigo),
+      ).length;
+
+      const sedes = marcaciones
+        .map((item) => item.sede)
+        .filter((item) => item)
+        .filter(
+          (sede, index, self) =>
+            index === self.findIndex((p) => p.id === sede.id),
+        );
+
+      const horasDiarias = contrato.horasContrato;
+      const horasSemanales =
+        horario.items.filter((h) => !h.diaLibre && !h.diaDescanso).length *
+        horasDiarias;
+      const horasMensuales = diasLaborados * horasDiarias;
+      const horasOrdinarias = horasDiarias > 8 ? 8 : horasDiarias;
+      const horasExtra = horasDiarias > 8 ? horasDiarias - 8 : 0;
+
+      const totalDiasMes = diasMes.length;
+
+      const salarioDiario = contrato.salarioMensual;
+
+      const salarioHora = parseFloat((salarioDiario / 8).toFixed(2));
+
+      const horasExtra25 = horasExtra > 2 ? horasExtra - 2 : horasExtra;
+
+      const horasExtra35 = horasExtra - horasExtra25;
+
+      const salarioHoraExtra25 = parseFloat((salarioHora * 1.25).toFixed(2));
+
+      const salarioHoraExtra35 = parseFloat((salarioHora * 1.35).toFixed(2));
+
+      const salarioHoraTotal =
+        salarioHora + salarioHoraExtra25 + salarioHoraExtra35;
+
+      const salarioDiarioExtra25 = horasExtra25 * salarioHoraExtra25;
+
+      const salarioDiarioExtra35 = horasExtra35 * salarioHoraExtra35;
+
+      const salarioDiarioTotal =
+        salarioDiario + salarioDiarioExtra25 + salarioDiarioExtra35;
+
+      const salarioMesExtra25 = salarioDiarioExtra25 * diasLaborados;
+
+      const salarioMesExtra35 = salarioDiarioExtra35 * diasLaborados;
+
+      const descuentoFaltas = parseFloat((faltas * salarioDiario).toFixed(2));
+
+      const salarioVacaciones = parseFloat(
+        (totalDiasVacaciones * salarioDiario).toFixed(2),
+      );
+
+      const salarioMensual = parseFloat(
+        (salarioDiario * diasLaborados).toFixed(2),
+      );
+
+      const salarioMensualTotal =
+        salarioMensual + salarioMesExtra25 + salarioMesExtra35;
+
+      const sueldoBruto = salarioMensualTotal;
+
+      const pagoNeto = sueldoBruto;
+
+      return {
+        ...x,
+        cargo,
+        sedes,
+        diasLaborados,
+        feriados,
+        faltas,
+        permisos,
+        descansos,
+        totalDias,
+        horasDiarias,
+        horasSemanales,
+        horasMensuales,
+        horasOrdinarias,
+        totalDiasMes,
+        salarioDiario,
+        salarioHora,
+        horasExtra25,
+        horasExtra35,
+        salarioHoraExtra25,
+        salarioHoraExtra35,
+        salarioHoraTotal,
+        salarioDiarioExtra25,
+        salarioDiarioExtra35,
+        salarioDiarioTotal,
+        salarioMensual,
+        salarioMesExtra25,
+        salarioMesExtra35,
+        sueldoBruto,
+        descuentoFaltas,
+        totalDiasVacaciones,
+        salarioVacaciones,
+        pagoNeto,
+      };
+    });
   }
 
   @ApiBearerAuth()

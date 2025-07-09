@@ -6,15 +6,11 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { ValidationMessages as v }  from '@common/messages/validation-messages';
+import { ValidationMessages as v } from '@common/messages/validation-messages';
 import { IsUnique } from '@common/validators/is-unique/is-unique.decorator';
 import { Rol } from './rol.model';
 
 export class RolDTO {
-  @IsUUID('4', { message: v.isUUID('id') })
-  @IsOptional()
-  id?: string;
-
   @IsNumber({}, { message: v.isNumber('orden') })
   @IsOptional()
   orden?: number;
@@ -34,6 +30,10 @@ export class RolDTO {
 }
 
 export class RolUpDTO {
+  @IsUUID('4', { message: v.isUUID('id') })
+  @IsOptional()
+  id?: string;
+
   @IsNumber({}, { message: v.isNumber('orden') })
   @IsOptional()
   orden?: number;

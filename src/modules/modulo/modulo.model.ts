@@ -20,7 +20,7 @@ import {
   attributes: { exclude: ['deletedAt'] }, // Excluir campo de eliminación lógica por defecto
 }))
 @Table({
-  tableName: 'modulo',
+  tableName: 'modulos',
   paranoid: true,
   timestamps: true,
 })

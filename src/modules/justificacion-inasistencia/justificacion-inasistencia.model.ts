@@ -107,6 +107,19 @@ export class JustificacionInasistencia extends Model {
   incluirExtra: boolean;
 
   @Column({
+    field: 'archivoNombre',
+    allowNull: true,
+    type: DataType.STRING,
+  })
+  archivoNombre: string;
+  
+  @Column({
+    field: 'mimetype',
+    allowNull: true,
+  })
+  mimetype: string;
+
+  @Column({
     field: 'archivo',
     allowNull: false,
     type: DataType.BLOB('long'),

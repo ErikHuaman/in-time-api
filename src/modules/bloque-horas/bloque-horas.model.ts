@@ -1,3 +1,4 @@
+import { HorarioTrabajadorItem } from '@modules/horario-trabajador-item/horario-trabajador-item.model';
 import {
   Column,
   DataType,
@@ -91,6 +92,9 @@ export class BloqueHoras extends Model {
     type: DataType.STRING,
   })
   borderColor: string;
+
+  @HasMany(() => HorarioTrabajadorItem, { foreignKey: 'idBloqueHoras' })
+  items: HorarioTrabajadorItem[];
 
   @Column({
     field: 'isActive',

@@ -86,7 +86,7 @@ export class HorarioTrabajadorItem extends Model {
   })
   idBloqueHoras: string;
 
-  @BelongsTo(() => BloqueHoras)
+  @BelongsTo(() => BloqueHoras, { as: 'bloque', foreignKey: 'idBloqueHoras' })
   bloque: BloqueHoras;
 
   @ForeignKey(() => HorarioTrabajador)
@@ -116,7 +116,7 @@ export class HorarioTrabajadorItem extends Model {
 
   @HasMany(() => JustificacionInasistencia)
   justificaciones: JustificacionInasistencia[];
-  
+
   @Column({
     field: 'isActive',
     defaultValue: true,

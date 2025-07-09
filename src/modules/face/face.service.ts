@@ -2,11 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
-import * as path from 'path';
-import { csToNetInput, faceapi } from '@faceApi/face-api.env';
-import * as canvas from 'canvas';
 import { InjectModel } from '@nestjs/sequelize';
 import { RegistroBiometrico } from '@modules/registro-biometrico/registro-biometrico.model';
 import { Trabajador } from '@modules/trabajador/trabajador.model';
@@ -21,13 +17,19 @@ import { Asistencia } from '@modules/asistencia/asistencia.model';
 import { getNextOrderValue } from '@common/utils/auto-increment.helper';
 import { Sede } from '@modules/sede/sede.model';
 import { Dispositivo } from '@modules/dispositivo/dispositivo.model';
-import { AsignacionSedeUsuario } from '@modules/asignacion-sede-usuario/asignacion-sede-usuario.model';
 import { AsistenciaUsuario } from '@modules/asistencia-usuario/asistencia-usuario.model';
 import { Usuario } from '@modules/usuario/usuario.model';
+import { Readable } from 'stream';
+import { firstValueFrom } from 'rxjs';
+import { HttpService } from '@nestjs/axios';
+import FormData from 'form-data';
+import { envs } from 'config/env';
+import { euclideanDistance } from '@common/utils/face-api.helper';
 
 @Injectable()
-export class FaceService implements OnModuleInit {
+export class FaceService {
   constructor(
+    private readonly httpService: HttpService,
     @InjectModel(RegistroBiometrico)
     private readonly modelRegistro: typeof RegistroBiometrico,
     @InjectModel(Asistencia)
@@ -38,45 +40,67 @@ export class FaceService implements OnModuleInit {
     private readonly modelUsuario: typeof Usuario,
   ) {}
 
-  private baseModelPath: string = path.join(process.cwd(), 'models');
-
-  async onModuleInit() {
-    await faceapi.nets.ssdMobilenetv1.loadFromDisk(
-      path.join(this.baseModelPath, 'ssd_mobilenetv1'),
-    );
-    await faceapi.nets.faceLandmark68Net.loadFromDisk(
-      path.join(this.baseModelPath, 'face_landmark_68'),
-    );
-    await faceapi.nets.faceRecognitionNet.loadFromDisk(
-      path.join(this.baseModelPath, 'face_recognition'),
-    );
-  }
-
-  async getDescriptorFromFile(filePath: string): Promise<Float32Array | null> {
-    const img = await canvas.loadImage(filePath);
-    const result = await faceapi
-      .detectSingleFace(csToNetInput(img))
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    return result?.descriptor ?? null;
-  }
-
   async getDescriptorFromBuffer(
     imageBuffer: Buffer,
-  ): Promise<Float32Array | null> {
-    try {
-      const img = await canvas.loadImage(imageBuffer);
-      const result = await faceapi
-        .detectSingleFace(csToNetInput(img))
-        .withFaceLandmarks()
-        .withFaceDescriptor();
+    filename: string,
+    mimetype: string,
+  ): Promise<{
+    msg: string;
+    descriptor: Float32Array | null;
+  }> {
+    const form = new FormData();
 
-      return result?.descriptor ?? null;
+    // Convertimos el buffer en un stream legible
+    const stream = Readable.from(imageBuffer);
+    form.append('file', stream, {
+      filename,
+      contentType: mimetype,
+    });
+
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${envs.SERVER_DOMAIN}/descriptor/from-buffer`,
+          form,
+          {
+            headers: form.getHeaders(),
+          },
+        ),
+      );
+
+      const descriptor = response.data?.descriptor;
+      return {
+        msg: response.data?.message,
+        descriptor: descriptor ? new Float32Array(descriptor) : null,
+      };
     } catch (error) {
-      console.error('Error al obtener el descriptor desde el buffer:', error);
-      return null;
+      console.error(
+        'Error al obtener descriptor desde la imagen:',
+        error?.message || error,
+      );
+      return {
+        msg: `Error al obtener descriptor desde la imagen: ${error?.message || error}`,
+        descriptor: null,
+      };
     }
+    // try {
+    //   const img = await canvas.loadImage(imageBuffer);
+    //   const result = await faceapi
+    //     .detectSingleFace(csToNetInput(img))
+    //     .withFaceLandmarks()
+    //     .withFaceDescriptor();
+
+    //   return {
+    //     msg: `Rostro encontrado`,
+    //     descriptor: result?.descriptor ?? null,
+    //   };
+    // } catch (error) {
+    //   console.error('Error al obtener el descriptor desde el buffer:', error);
+    //   return {
+    //     msg: `Error al obtener descriptor desde la imagen: ${error?.message || error}`,
+    //     descriptor: null,
+    //   };
+    // }
   }
 
   async compareWithReference(
@@ -84,7 +108,20 @@ export class FaceService implements OnModuleInit {
     dto: MarcacionAsistenciaDTO,
     imageBuffer: Buffer,
     fileName: string,
+    mimetype: string,
   ): Promise<any> {
+    const resFace = await this.getDescriptorFromBuffer(
+      imageBuffer,
+      fileName,
+      mimetype,
+    );
+
+    if (!resFace.descriptor) {
+      throw new BadRequestException(resFace.msg);
+    }
+
+    const descriptorSubida = resFace.descriptor;
+
     const fechaAsistencia = new Date(dto.fecha);
 
     const bio = await this.modelRegistro.findOne({
@@ -106,34 +143,43 @@ export class FaceService implements OnModuleInit {
             },
             {
               model: HorarioTrabajador,
+              where: { isActive: true },
               include: [
                 {
                   model: TurnoTrabajo,
                 },
                 {
                   model: HorarioTrabajadorItem,
+                  where: { isActive: true },
+                  required: true,
                   include: [
                     {
                       model: BloqueHoras,
+                      where: { isActive: true },
+                      required: false,
                     },
                     {
                       model: Sede,
+                      where: { isActive: true },
                       include: [
                         {
                           model: Dispositivo,
+                          where: { isActive: true },
+                          required: false,
                         },
                       ],
+                      required: false,
                     },
                   ],
-                  required: true,
                 },
               ],
-              required: false,
+              required: true,
             },
           ],
           where: { identificacion },
         },
       ],
+      logging: console.log, // <-- Esto imprime el SQL generado por Sequelize
     });
 
     if (
@@ -206,6 +252,11 @@ export class FaceService implements OnModuleInit {
       );
     }
 
+    console.log(
+      'horarioItem.sede',
+      horarioItem.sede.get().dispositivos.map((d: Dispositivo) => d.get()),
+    );
+
     const dispositivo = horarioItem.sede
       .get()
       .dispositivos.map((d: Dispositivo) => d.get())
@@ -261,16 +312,12 @@ export class FaceService implements OnModuleInit {
 
     if (dto.codigo) {
       if (imageBuffer) {
-        let descriptor: Float32Array | null =
-          await this.getDescriptorFromBuffer(imageBuffer);
-        if (!descriptor) {
-          throw new BadRequestException('No se detectó un rostro en la imagen');
-        }
         const archivo = Buffer.from(imageBuffer);
         await bio.update({
           archivo,
           archivoNombre: fileName,
-          descriptor: Array.from(descriptor),
+          mimetype,
+          descriptor: Array.from(descriptorSubida),
           codigo: null,
         });
 
@@ -298,19 +345,8 @@ export class FaceService implements OnModuleInit {
       }
     } else {
       const descriptorReferencia = new Float32Array(bio.get().descriptor);
-      const descriptorSubida = await this.getDescriptorFromBuffer(imageBuffer);
 
-      if (!descriptorReferencia) {
-        throw new NotFoundException(
-          'No se encontró el descriptor de referencia',
-        );
-      }
-
-      if (!descriptorSubida) {
-        throw new NotFoundException('No se encontró la cara en la imagen');
-      }
-
-      const distance = faceapi.euclideanDistance(
+      const distance = euclideanDistance(
         descriptorReferencia,
         descriptorSubida,
       );
@@ -360,7 +396,20 @@ export class FaceService implements OnModuleInit {
     dto: MarcacionAsistenciaDTO,
     imageBuffer: Buffer,
     fileName: string,
+    mimetype: string,
   ): Promise<any> {
+    const resFace = await this.getDescriptorFromBuffer(
+      imageBuffer,
+      fileName,
+      mimetype,
+    );
+
+    if (!resFace.descriptor) {
+      throw new BadRequestException(resFace.msg);
+    }
+
+    const descriptorSubida = resFace.descriptor;
+
     const fechaAsistencia = new Date(dto.fecha);
 
     console.log('fechaAsistencia', fechaAsistencia);
@@ -441,20 +490,12 @@ export class FaceService implements OnModuleInit {
     }
 
     const descriptorReferencia = new Float32Array(usuario.descriptor);
-    const descriptorSubida = await this.getDescriptorFromBuffer(imageBuffer);
 
     if (!descriptorReferencia) {
       throw new NotFoundException('No se encontró el descriptor de referencia');
     }
 
-    if (!descriptorSubida) {
-      throw new NotFoundException('No se encontró la cara en la imagen');
-    }
-
-    const distance = faceapi.euclideanDistance(
-      descriptorReferencia,
-      descriptorSubida,
-    );
+    const distance = euclideanDistance(descriptorReferencia, descriptorSubida);
 
     if (distance < 0.6) {
       const orden = await getNextOrderValue(this.modelAsistenciaUsuario);

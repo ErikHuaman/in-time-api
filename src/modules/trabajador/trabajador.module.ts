@@ -12,6 +12,7 @@ import { ControlTrabajadorModule } from '@modules/control-trabajador/control-tra
 import { BeneficioTrabajadorModule } from '@modules/beneficio-trabajador/beneficio-trabajador.module';
 import { AsignacionSedeModule } from '@modules/asignacion-sede/asignacion-sede.module';
 import { FaceModule } from '@modules/face/face.module';
+import { InactivacionTrabajadorModule } from '@modules/inactivacion-trabajador/inactivacion-trabajador.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { FaceModule } from '@modules/face/face.module';
     BeneficioTrabajadorModule,
     AsignacionSedeModule,
     FaceModule,
+    InactivacionTrabajadorModule
   ],
   controllers: [TrabajadorController],
   providers: [TrabajadorService, TrabajadorRepository],

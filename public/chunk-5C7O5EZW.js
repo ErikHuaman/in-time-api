@@ -1,1 +1,0 @@
-import{Gb as e,Hb as p,ac as a,hb as t}from"./chunk-VDH5VFWZ.js";import"./chunk-EQDQRRRY.js";var i=class o{static \u0275fac=function(n){return new(n||o)};static \u0275cmp=t({type:o,selectors:[["app-not-found"]],decls:2,vars:0,template:function(n,m){n&1&&(e(0,"p"),a(1,"not-found works!"),p())},encapsulation:2})};export{i as NotFoundComponent};

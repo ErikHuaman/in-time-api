@@ -10,6 +10,12 @@ import {
 } from 'sequelize';
 import { Model, ModelStatic } from 'sequelize-typescript';
 
+// Crea un tipo extendido que incluya "distinct"
+interface ExtendedFindOptions<T> extends FindOptions<T> {
+  distinct?: boolean;
+  subQuery?: boolean;
+}
+
 export class GenericCrudRepository<T extends Model> {
   protected readonly model: ModelStatic<T> & typeof Model;
 
@@ -17,26 +23,31 @@ export class GenericCrudRepository<T extends Model> {
     this.model = model as ModelStatic<T> & typeof Model;
   }
 
-  async findAll(options?: FindOptions<T>): Promise<T[]> {
+  async findAll(options?: ExtendedFindOptions<T>): Promise<T[]> {
     const results = await this.model.findAll({
       ...options,
-    } as FindOptions);
+    });
 
     return results as T[];
   }
 
   async findAndCountAll(
-    options?: FindOptions<T>,
+    options?: ExtendedFindOptions<T>,
+    otherOptions?: ExtendedFindOptions<T>,
   ): Promise<PaginatedResponse<T>> {
-    const results = await this.model.findAndCountAll({
-      ...options,
+    // console.log("options?.where", options?.where);
+    const total = await this.model.count({
+      where: otherOptions ? otherOptions.where : options?.where,
     } as FindOptions);
+    const results = await this.model.findAll({
+      ...options,
+    });
 
     return {
-      total: results.count,
+      total,
       limit: options?.limit,
       offset: options?.offset,
-      data: results.rows as T[],
+      data: results as T[],
     };
   }
 
@@ -61,11 +72,11 @@ export class GenericCrudRepository<T extends Model> {
   async bulkCreate(
     dtos: Partial<T>[],
     options?: BulkCreateOptions<any>,
-    restoreOpts?: FindOptions<T>,
+    restoreWhere?: WhereOptions<T>,
   ): Promise<T[]> {
-    if (restoreOpts) {
+    if (restoreWhere) {
       await this.model.restore({
-        ...restoreOpts,
+        where: restoreWhere,
       });
     }
 
@@ -85,6 +96,10 @@ export class GenericCrudRepository<T extends Model> {
     const row = await this.model.findOne({ where: { id } } as FindOptions);
 
     return [count, [row] as T[]];
+  }
+
+  async updateOther(dto: Partial<T>, whereOption: UpdateOptions) {
+    await this.model.update(dto, whereOption);
   }
 
   async delete(id: string): Promise<void> {

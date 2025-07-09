@@ -4,7 +4,6 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { Trabajador } from './trabajador.model';
-import { TrabajadorDTO } from './trabajador.dto';
 import { Sede } from '@modules/sede/sede.model';
 import { Cargo } from '@modules/cargo/cargo.model';
 import { TiempoContrato } from '@modules/tiempo-contrato/tiempo-contrato.model';
@@ -20,7 +19,7 @@ import { Dispositivo } from '@modules/dispositivo/dispositivo.model';
 import { HorarioTrabajador } from '@modules/horario-trabajador/horario-trabajador.model';
 import { HorarioTrabajadorItem } from '@modules/horario-trabajador-item/horario-trabajador-item.model';
 import { BloqueHoras } from '@modules/bloque-horas/bloque-horas.model';
-import { col, fn, Op, where } from 'sequelize';
+import { col, fn, literal, Op, Sequelize, where } from 'sequelize';
 import { Asistencia } from '@modules/asistencia/asistencia.model';
 import { TurnoTrabajo } from '@modules/turno-trabajo/turno-trabajo.model';
 import { RegistroBiometrico } from '@modules/registro-biometrico/registro-biometrico.model';
@@ -56,65 +55,13 @@ export class TrabajadorService {
     private readonly asignacionRepository: AsignacionSedeRepository,
   ) {}
 
-  // async findAll(idUsuario: string, codigo: string): Promise<Trabajador[]> {
-  //   let whereCondition: any = { isActive: true };
-  //   if (codigo === 'super' || codigo === 'admin') {
-  //     whereCondition = { isActive: true };
-  //   } else {
-  //     whereCondition = {
-  //       isActive: true,
-  //       idUsuario,
-  //     };
-  //   }
-  //   return this.repository.findAll({
-  //     include: [
-  //       {
-  //         model: ContratoTrabajador,
-  //         where: { isActive: true },
-  //         include: [
-  //           {
-  //             model: Cargo,
-  //             required: false,
-  //           },
-  //           {
-  //             model: TiempoContrato,
-  //             required: false,
-  //           },
-  //         ],
-  //         required: false,
-  //       },
-  //       {
-  //         model: Sede,
-  //         through: { attributes: [] },
-  //         where: { isActive: true },
-  //         include: [
-  //           {
-  //             model: Sede,
-  //             required: false,
-  //             include: [
-  //               {
-  //                 model: Sede,
-  //                 through: { attributes: [] },
-  //                 where: whereCondition,
-  //                 required: false,
-  //               },
-  //             ],
-  //           },
-  //         ],
-  //         required: false,
-  //       },
-  //       { model: ControlTrabajador },
-  //     ],
-  //   });
-  // }
-
   async findAll(
     user: Usuario,
     limit: number,
     offset: number,
     filter?: boolean,
     search?: string,
-    isAsigned: boolean = false
+    isAsigned: boolean = false,
   ): Promise<PaginatedResponse<Trabajador>> {
     const searchTerm = (search || '').toLowerCase();
     let whereCondition: any = { isActive: true };
@@ -126,54 +73,102 @@ export class TrabajadorService {
         id: user?.id,
       };
     }
-    return this.repository.findAndCountAll({
+    const currentDate = new Date();
+    const idsSinSuspension = await this.repository.findAll({
+      attributes: ['id'],
       where: {
         isActive: true,
-        [Op.or]: [
-          where(fn('LOWER', col('Trabajador.nombre')), {
-            [Op.like]: `%${searchTerm}%`,
-          }),
-          where(fn('LOWER', col('Trabajador.apellido')), {
-            [Op.like]: `%${searchTerm}%`,
-          }),
-          where(fn('LOWER', col('Trabajador.identificacion')), {
-            [Op.like]: `%${searchTerm}%`,
-          }),
-        ],
+        ...(searchTerm && {
+          [Op.or]: [
+            where(fn('LOWER', col('Trabajador.nombre')), {
+              [Op.like]: `%${searchTerm.toLowerCase()}%`,
+            }),
+            where(fn('LOWER', col('Trabajador.apellido')), {
+              [Op.like]: `%${searchTerm.toLowerCase()}%`,
+            }),
+            where(fn('LOWER', col('Trabajador.identificacion')), {
+              [Op.like]: `%${searchTerm.toLowerCase()}%`,
+            }),
+          ],
+        }),
       },
       include: [
         {
-          model: ContratoTrabajador,
-          where: { isActive: true },
-          include: [
-            {
-              model: Cargo,
-              where: { isActive: true },
-              required: false,
-            },
-            {
-              model: TiempoContrato,
-              required: false,
-            },
-          ],
+          model: InactivacionTrabajador,
+          as: 'inactivaciones',
           required: false,
+          where: {
+            isActive: true,
+            fechaInicio: { [Op.lte]: currentDate },
+            fechaFin: { [Op.gte]: currentDate },
+          },
         },
-        {
-          model: Sede,
-          through: { attributes: [] },
-          where: { isActive: true },
-          required: isAsigned,
-        },
-        { model: ControlTrabajador, where: { isActive: true } },
       ],
-      order: [
-        ['orden', 'DESC'],
-        [{ model: ContratoTrabajador, as: 'contratos' }, 'orden', 'DESC'],
-        [{ model: Sede, as: 'sedes' }, 'orden', 'DESC'],
-      ],
+      having: literal('`inactivaciones`.`id` IS NULL'),
+      subQuery: false,
+      distinct: true,
       limit,
       offset,
+      order: [['orden', 'DESC']],
     });
+    return this.repository.findAndCountAll(
+      {
+        where: {
+          id: { [Op.in]: idsSinSuspension.map((t) => t.id) },
+        },
+        include: [
+          {
+            model: ContratoTrabajador,
+            where: { isActive: true },
+            required: false,
+            include: [
+              {
+                model: Cargo,
+                where: { isActive: true },
+                required: false,
+              },
+              {
+                model: TiempoContrato,
+                required: false,
+              },
+            ],
+          },
+          {
+            model: Sede,
+            through: { attributes: [] },
+            where: { isActive: true },
+            required: isAsigned,
+          },
+          {
+            model: ControlTrabajador,
+            where: { isActive: true },
+          },
+        ],
+        order: [
+          ['orden', 'DESC'],
+          [{ model: ContratoTrabajador, as: 'contratos' }, 'orden', 'DESC'],
+          [{ model: Sede, as: 'sedes' }, 'orden', 'DESC'],
+        ],
+      },
+      {
+        where: {
+          isActive: true,
+          ...(searchTerm && {
+            [Op.or]: [
+              where(fn('LOWER', col('Trabajador.nombre')), {
+                [Op.like]: `%${searchTerm.toLowerCase()}%`,
+              }),
+              where(fn('LOWER', col('Trabajador.apellido')), {
+                [Op.like]: `%${searchTerm.toLowerCase()}%`,
+              }),
+              where(fn('LOWER', col('Trabajador.identificacion')), {
+                [Op.like]: `%${searchTerm.toLowerCase()}%`,
+              }),
+            ],
+          }),
+        },
+      },
+    );
   }
 
   async findAllInactives(
@@ -186,7 +181,6 @@ export class TrabajadorService {
     const searchTerm = (search || '').toLowerCase();
     return this.repository.findAndCountAll({
       where: {
-        isActive: false,
         ...(searchTerm && {
           [Op.or]: [
             where(fn('LOWER', col('Trabajador.nombre')), {
@@ -205,20 +199,11 @@ export class TrabajadorService {
         {
           model: InactivacionTrabajador,
           where: { isActive: true },
-          separate: true,
-          limit: 1,
-          required: false,
+          required: true,
         },
       ],
       limit,
       offset,
-      // order: [
-      //   [
-      //     { model: InactivacionTrabajador, as: 'inactivaciones' },
-      //     'orden',
-      //     'DESC',
-      //   ],
-      // ],
     });
   }
 
@@ -234,9 +219,6 @@ export class TrabajadorService {
         {
           model: RegistroBiometrico,
           where: { isActive: true },
-          attributes: {
-            exclude: ['archivo', 'descriptor'],
-          },
           required: false,
         },
         {
@@ -289,7 +271,8 @@ export class TrabajadorService {
   async create(
     dto: Partial<Trabajador>,
     archivo?: Buffer<ArrayBufferLike>,
-    archivoNombre?: string,
+    filename?: string,
+    mimetype?: string,
     descriptor?: number[],
   ): Promise<Trabajador | null> {
     try {
@@ -334,7 +317,8 @@ export class TrabajadorService {
               ({
                 ...biometrico,
                 archivo,
-                archivoNombre,
+                filename,
+                mimetype,
                 descriptor,
                 orden: ordenBiometrico,
               }) as RegistroBiometrico,
@@ -502,7 +486,8 @@ export class TrabajadorService {
     id: string,
     dto: Partial<Trabajador>,
     archivo?: Buffer<ArrayBufferLike>,
-    archivoNombre?: string,
+    filename?: string,
+    mimetype?: string,
     descriptor?: number[],
   ): Promise<[number, Trabajador[]]> {
     try {
@@ -530,8 +515,11 @@ export class TrabajadorService {
         for (const item of biometricos!) {
           await this.biometricoRepository.update(item.id, {
             ...item,
+            codigo: archivo ? null : undefined,
             archivo,
-            archivoNombre,
+
+            filename,
+            mimetype,
             descriptor,
           });
         }
@@ -578,11 +566,9 @@ export class TrabajadorService {
             ignoreDuplicates: true,
           },
           {
-            where: {
-              idTrabajador: id,
-              idSede: {
-                [Op.in]: sedes.map((dto) => dto.id),
-              },
+            idTrabajador: id,
+            idSede: {
+              [Op.in]: sedes.map((dto) => dto.id),
             },
           },
         );
@@ -624,7 +610,8 @@ export class TrabajadorService {
     const data = result.toJSON();
     return {
       id: data.id,
-      fileName: data.archivoNombre,
+      filename: data.filename,
+      mimetype: data.mimetype,
       file: data.archivo,
     };
   }
@@ -653,15 +640,17 @@ export class TrabajadorService {
         {
           model: HorarioTrabajador,
           as: 'horarios',
+          where: { isActive: true },
           include: [
             {
               model: HorarioTrabajadorItem,
               as: 'items',
-              where: { numDia: dia },
+              where: { numDia: dia, isActive: true },
               include: [
                 {
                   model: BloqueHoras,
-                  as: 'bloque',
+                  where: { isActive: true },
+                  required: false,
                 },
               ],
             },
@@ -686,7 +675,7 @@ export class TrabajadorService {
           where: {
             isActive: true,
             fechaInicio: {
-              [Op.lte]: primerDia.toISOString().split('T')[0],
+              [Op.lte]: ultimoDia.toISOString().split('T')[0],
             },
           },
           include: [
@@ -704,9 +693,6 @@ export class TrabajadorService {
             {
               model: Usuario,
               through: { attributes: [] },
-              attributes: {
-                exclude: ['archivo', 'descriptor'],
-              },
               where: {
                 isActive: true,
                 id: idUsuario,
@@ -717,26 +703,29 @@ export class TrabajadorService {
         },
         {
           model: HorarioTrabajador,
+          where: { isActive: true },
           include: [
             {
               model: TurnoTrabajo,
+              where: { isActive: true },
             },
             {
               model: HorarioTrabajadorItem,
+              where: { isActive: true },
               include: [
                 {
                   model: BloqueHoras,
+                  where: { isActive: true },
+                  required: false,
                 },
                 {
                   model: JustificacionInasistencia,
-                  attributes: {
-                    exclude: ['archivo'],
-                  },
                   where: { isActive: true },
                   required: false,
                 },
                 {
                   model: Sede,
+                  where: { isActive: true },
                 },
               ],
             },
@@ -837,6 +826,44 @@ export class TrabajadorService {
           },
           required: false,
         },
+        {
+          model: InactivacionTrabajador,
+          where: {
+            [Op.or]: [
+              {
+                fechaInicio: {
+                  [Op.between]: [
+                    primerDia.toISOString().split('T')[0],
+                    ultimoDia.toISOString().split('T')[0],
+                  ],
+                },
+              },
+              {
+                fechaFin: {
+                  [Op.between]: [
+                    primerDia.toISOString().split('T')[0],
+                    ultimoDia.toISOString().split('T')[0],
+                  ],
+                },
+              },
+              {
+                [Op.and]: [
+                  {
+                    fechaInicio: {
+                      [Op.lte]: primerDia.toISOString().split('T')[0],
+                    },
+                  },
+                  {
+                    fechaFin: {
+                      [Op.gte]: ultimoDia.toISOString().split('T')[0],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          required: false,
+        },
       ],
     });
   }
@@ -875,15 +902,20 @@ export class TrabajadorService {
         },
         {
           model: HorarioTrabajador,
+          where: { isActive: true },
           include: [
             {
               model: TurnoTrabajo,
+              where: { isActive: true },
             },
             {
               model: HorarioTrabajadorItem,
+              where: { isActive: true },
               include: [
                 {
                   model: BloqueHoras,
+                  where: { isActive: true },
+                  required: false,
                 },
               ],
             },
@@ -994,7 +1026,10 @@ export class TrabajadorService {
     });
   }
 
-  async findAllByMonthDescanseros(date: Date): Promise<Trabajador[]> {
+  async findAllByMonthDescanseros(
+    date: Date,
+    idUsuario: string,
+  ): Promise<Trabajador[]> {
     const fecha = new Date(date);
     // Primer día del mes
     const primerDia = new Date(fecha.getFullYear(), fecha.getMonth(), 1);
@@ -1026,18 +1061,45 @@ export class TrabajadorService {
         {
           model: Sede,
           through: { attributes: [] },
+          required: true,
+          include: [
+            {
+              model: Usuario,
+              through: { attributes: [] },
+              where: {
+                isActive: true,
+                id: idUsuario,
+              },
+              required: true,
+            },
+          ],
         },
         {
           model: HorarioTrabajador,
+          where: { isActive: true },
           include: [
             {
               model: TurnoTrabajo,
+              where: { isActive: true },
             },
             {
               model: HorarioTrabajadorItem,
+              where: { isActive: true },
+              required: false,
               include: [
                 {
                   model: BloqueHoras,
+                  where: { isActive: true },
+                  required: false,
+                },
+                {
+                  model: JustificacionInasistencia,
+                  where: { isActive: true },
+                  required: false,
+                },
+                {
+                  model: Sede,
+                  where: { isActive: true },
                 },
               ],
             },
@@ -1171,15 +1233,20 @@ export class TrabajadorService {
         },
         {
           model: HorarioTrabajador,
+          where: { isActive: true },
           include: [
             {
               model: TurnoTrabajo,
+              where: { isActive: true },
             },
             {
               model: HorarioTrabajadorItem,
+              where: { isActive: true },
               include: [
                 {
                   model: BloqueHoras,
+                  where: { isActive: true },
+                  required: false,
                 },
               ],
             },
@@ -1319,15 +1386,20 @@ export class TrabajadorService {
         },
         {
           model: HorarioTrabajador,
+          where: { isActive: true },
           include: [
             {
               model: TurnoTrabajo,
+              where: { isActive: true },
             },
             {
               model: HorarioTrabajadorItem,
+              where: { isActive: true },
               include: [
                 {
                   model: BloqueHoras,
+                  where: { isActive: true },
+                  required: false,
                 },
               ],
             },

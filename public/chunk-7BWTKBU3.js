@@ -1,1 +1,0 @@
-function o(t){let a=new FormData;for(let e in t)if(t.hasOwnProperty(e)){let n=t[e];n instanceof File?a.append(e,n,n.name):typeof n=="boolean"?a.append(e,n.toString()):n!=null&&a.append(e,n)}return a}export{o as a};

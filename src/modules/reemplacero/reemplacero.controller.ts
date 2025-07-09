@@ -69,19 +69,27 @@ export class ReemplaceroController {
     @Body('dto', ParseJsonPipe) dto: Partial<Reemplacero>,
   ): Promise<Reemplacero | null> {
     if (file) {
-      dto.archivoNombre = file.originalname;
-      let descriptor: Float32Array | null =
-        await this.faceService.getDescriptorFromBuffer(file.buffer);
-      if (!descriptor) {
-        throw new BadRequestException('No se detectó rostro en la imagen');
+      const resFace = await this.faceService.getDescriptorFromBuffer(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+      );
+
+      if (!resFace.descriptor) {
+        throw new BadRequestException(resFace.msg);
       }
+
+      let descriptor: Float32Array = resFace.descriptor;
+
       return this.service.create(
         dto,
         Buffer.from(file.buffer),
+        file.originalname,
+        file.mimetype,
         Array.from(descriptor),
       );
     } else {
-      return this.service.create(dto, undefined, undefined);
+      return this.service.create(dto);
     }
   }
 
@@ -95,16 +103,29 @@ export class ReemplaceroController {
     @Body('dto', ParseJsonPipe) dto: Partial<Reemplacero>,
   ): Promise<[number, Reemplacero[]]> {
     if (file) {
-      dto.archivoNombre = file.originalname;
-      let descriptor: Float32Array | null =
-        await this.faceService.getDescriptorFromBuffer(file.buffer);
-      if (!descriptor) {
-        throw new BadRequestException('No se detectó un rostro en la imagen');
+      const resFace = await this.faceService.getDescriptorFromBuffer(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+      );
+
+      if (!resFace.descriptor) {
+        throw new BadRequestException(resFace.msg);
       }
+
+      let descriptor: Float32Array = resFace.descriptor;
+
       const archivo = Buffer.from(file.buffer);
-      return this.service.update(id, dto, archivo, Array.from(descriptor));
+      return this.service.update(
+        id,
+        dto,
+        archivo,
+        file.originalname,
+        file.mimetype,
+        Array.from(descriptor),
+      );
     }
-    return this.service.update(id, dto, undefined, undefined);
+    return this.service.update(id, dto);
   }
 
   @ApiBearerAuth()
@@ -138,9 +159,9 @@ export class ReemplaceroController {
     const archivo = await this.service.obtenerArchivo(id);
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${archivo.fileName}"`,
+      `attachment; filename="${archivo.filename}"`,
     );
-    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Type', archivo.mimetype);
     return res.send(archivo.file);
   }
 }

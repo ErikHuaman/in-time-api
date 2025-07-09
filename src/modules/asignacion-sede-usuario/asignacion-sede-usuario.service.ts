@@ -139,15 +139,20 @@ export class AsignacionSedeUsuarioService {
                 },
                 {
                   model: HorarioTrabajador,
+                  where: { isActive: true },
                   include: [
                     {
                       model: TurnoTrabajo,
+                      where: { isActive: true },
                     },
                     {
                       model: HorarioTrabajadorItem,
+                      where: { isActive: true },
                       include: [
                         {
                           model: BloqueHoras,
+                          where: { isActive: true },
+                          required: false,
                         },
                         {
                           model: JustificacionInasistencia,

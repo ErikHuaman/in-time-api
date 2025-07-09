@@ -117,6 +117,7 @@ export class GrupoModuloService {
       include: [
         {
           model: Modulo,
+          where: {isActive: true},
           as: 'modulos', // 👈 debe coincidir con el alias del @BelongsToMany
           required: true,
           include: [

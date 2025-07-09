@@ -6,9 +6,11 @@ import { RegistroBiometrico } from '@modules/registro-biometrico/registro-biomet
 import { Asistencia } from '@modules/asistencia/asistencia.model';
 import { AsistenciaUsuario } from '@modules/asistencia-usuario/asistencia-usuario.model';
 import { Usuario } from '@modules/usuario/usuario.model';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
+    HttpModule,
     SequelizeModule.forFeature([RegistroBiometrico]),
     SequelizeModule.forFeature([Asistencia]),
     SequelizeModule.forFeature([AsistenciaUsuario]),

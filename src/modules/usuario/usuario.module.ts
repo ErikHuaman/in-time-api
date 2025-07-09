@@ -5,11 +5,13 @@ import { UsuarioService } from './usuario.service';
 import { Usuario } from './usuario.model';
 import { FaceModule } from '@modules/face/face.module';
 import { UsuarioRepository } from './usuario.repository';
+import { AsignacionSedeUsuarioModule } from '@modules/asignacion-sede-usuario/asignacion-sede-usuario.module';
 
 @Module({
   imports: [
     SequelizeModule.forFeature([Usuario]),
     forwardRef(() => FaceModule),
+    AsignacionSedeUsuarioModule,
   ],
   controllers: [UsuarioController],
   providers: [UsuarioService, UsuarioRepository],

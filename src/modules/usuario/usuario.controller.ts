@@ -6,6 +6,7 @@ import {
   forwardRef,
   Get,
   Inject,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -67,16 +68,25 @@ export class UsuarioController {
     @UploadedFile() file: Express.Multer.File,
     @Body('dto', ParseJsonPipe) dto: Partial<Usuario>,
   ): Promise<Usuario | null> {
+    console.log('dto', dto);
     if (file) {
-      dto.archivoNombre = file.originalname;
-      let descriptor: Float32Array | null =
-        await this.faceService.getDescriptorFromBuffer(file.buffer);
-      if (!descriptor) {
-        throw new BadRequestException('No se detectó rostro en la imagen');
+      const resFace = await this.faceService.getDescriptorFromBuffer(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+      );
+
+      if (!resFace.descriptor) {
+        throw new BadRequestException(resFace.msg);
       }
+
+      let descriptor: Float32Array = resFace.descriptor;
+
       return this.service.create(
         dto,
         Buffer.from(file.buffer),
+        file.originalname,
+        file.mimetype,
         Array.from(descriptor),
       );
     } else {
@@ -94,14 +104,26 @@ export class UsuarioController {
     @Body('dto', ParseJsonPipe) dto: Partial<Usuario>,
   ): Promise<[number, Usuario[]]> {
     if (file) {
-      dto.archivoNombre = file.originalname;
-      let descriptor: Float32Array | null =
-        await this.faceService.getDescriptorFromBuffer(file.buffer);
-      if (!descriptor) {
-        throw new BadRequestException('No se detectó un rostro en la imagen');
+      const resFace = await this.faceService.getDescriptorFromBuffer(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+      );
+
+      if (!resFace.descriptor) {
+        throw new BadRequestException(resFace.msg);
       }
+
+      let descriptor: Float32Array = resFace.descriptor;
       const archivo = Buffer.from(file.buffer);
-      return this.service.update(id, dto, archivo, Array.from(descriptor));
+      return this.service.update(
+        id,
+        dto,
+        archivo,
+        file.originalname,
+        file.mimetype,
+        Array.from(descriptor),
+      );
     }
     return this.service.update(id, dto, undefined, undefined);
   }
@@ -137,9 +159,9 @@ export class UsuarioController {
     const archivo = await this.service.obtenerArchivo(id);
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${archivo.fileName}"`,
+      `attachment; filename="${archivo.filename}"`,
     );
-    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Type', archivo.mimetype);
     return res.send(archivo.file);
   }
 }

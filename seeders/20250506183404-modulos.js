@@ -4,7 +4,7 @@
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.bulkInsert(
-      'modulo',
+      'modulos',
       [
         {
           id: 'cd8d28f6-95ea-491a-82a5-f7567c09a537',
@@ -21,8 +21,8 @@ module.exports = {
         {
           id: 'e2b05049-d2bd-4aa8-9941-6426b78d5302',
           orden: 2,
-          nombre: 'Trabajadores inactivos',
-          url: '/organizacion/trabajadores-inactivos',
+          nombre: 'Trabajadores suspendidos',
+          url: '/organizacion/trabajadores-suspendidos',
           icono: 'material-symbols:person-cancel-outline',
           idGrupoModulo: '2d9398f4-5db2-4282-82b3-b558073b11e3',
           isActive: true,
@@ -169,7 +169,7 @@ module.exports = {
           url: '/planilla/pago-reemplazos',
           icono: 'material-symbols:supervisor-account-sharp',
           idGrupoModulo: 'e577f352-6877-47a1-91ff-f8aa95bd1acc',
-          isActive: true,
+          isActive: false,
           createdAt: new Date('2025-04-11T09:57:01.000Z'),
           updatedAt: new Date('2025-04-11T09:57:01.000Z'),
           deletedAt: null,

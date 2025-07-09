@@ -57,6 +57,7 @@ import { BullModule } from '@nestjs/bull';
 import { AuthModule } from '@core/auth/auth.module';
 import { PdfModule } from './core/pdf/pdf.module';
 import { SedeParametroModule } from './modules/sede-parametro/sede-parametro.module';
+import { FirebaseModule } from './core/firebase/firebase.module';
 
 @Module({
   imports: [
@@ -123,6 +124,7 @@ import { SedeParametroModule } from './modules/sede-parametro/sede-parametro.mod
     MailModule,
     PdfModule,
     SedeParametroModule,
+    FirebaseModule,
   ],
   controllers: [],
   providers: [],

@@ -233,9 +233,13 @@ export class SedeService {
                   include: [
                     {
                       model: Sede,
+                      where: { isActive: true },
+                      required: false,
                     },
                     {
                       model: BloqueHoras,
+                      where: { isActive: true },
+                      required: false,
                     },
                     {
                       model: JustificacionInasistencia,
@@ -246,7 +250,7 @@ export class SedeService {
                       required: false,
                     },
                   ],
-                  required: true
+                  required: true,
                 },
               ],
               required: true,

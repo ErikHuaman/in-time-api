@@ -47,7 +47,11 @@ export class InactivacionTrabajadorService {
   ): Promise<InactivacionTrabajador | null> {
     try {
       const orden = await this.repository.getNextOrderValue();
-      return this.repository.create({ ...dto, orden });
+
+      const fechaFin = new Date(dto.fechaFin);
+      fechaFin.setHours(23, 59, 59);
+
+      return this.repository.create({ ...dto, fechaFin, orden });
     } catch (error) {
       if (error.name === 'SequelizeUniqueConstraintError') {
         throw new BadRequestException('Ya existe un registro con ese valor');
@@ -61,7 +65,9 @@ export class InactivacionTrabajadorService {
     dto: InactivacionTrabajadorDTO,
   ): Promise<[number, InactivacionTrabajador[]]> {
     try {
-      return this.repository.update(id, dto);
+      const fechaFin = new Date(dto.fechaFin);
+      fechaFin.setHours(23, 59, 59);
+      return this.repository.update(id, { ...dto, fechaFin });
     } catch (error) {
       if (error.name === 'SequelizeUniqueConstraintError') {
         throw new BadRequestException('Ya existe un registro con ese valor');

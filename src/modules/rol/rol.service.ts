@@ -116,7 +116,7 @@ export class RolService {
       include: [
         {
           model: Modulo,
-          where: { url },
+          where: { url, isActive: true },
           through: { attributes: [] },
           required: true,
         },

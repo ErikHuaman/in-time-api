@@ -20,8 +20,9 @@
     "paths": {
       "@modules/*": ["src/modules/*"],
       "@core/*": ["src/core/*"],
-      "@common/*": ["src/common/*"],
-      "@faceApi/*": ["src/face-api/*"]
-    }
+      "@common/*": ["src/common/*"]
+    },
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
   }
 }

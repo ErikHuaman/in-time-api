@@ -45,11 +45,17 @@ export class RegistroBiometrico extends Model {
   orden: number;
 
   @Column({
-    field: 'nombre',
+    field: 'filename',
     allowNull: true,
   })
-  archivoNombre: string;
+  filename: string;
 
+  @Column({
+    field: 'mimetype',
+    allowNull: true,
+  })
+  mimetype: string;
+  
   @Column({
     field: 'archivo',
     allowNull: true,
@@ -68,7 +74,7 @@ export class RegistroBiometrico extends Model {
     allowNull: true,
     type: DataType.STRING,
   })
-  codigo: string;
+  codigo: string | null;
 
   @ForeignKey(() => Trabajador)
   @Column({

@@ -20,8 +20,11 @@ export class InactivacionTrabajadorDTO {
   @IsNotEmpty({ message: v.isNotEmpty('motivoSuspension') })
   motivoSuspension: string;
 
-  @IsNotEmpty({ message: v.isNotEmpty('fechaSuspension') })
-  fechaSuspension: Date;
+  @IsNotEmpty({ message: v.isNotEmpty('fechaInicio') })
+  fechaInicio: Date;
+
+  @IsNotEmpty({ message: v.isNotEmpty('fechaFin') })
+  fechaFin: Date;
 
   @IsString({ message: v.isString('nota') })
   @IsOptional()

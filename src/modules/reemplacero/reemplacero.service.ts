@@ -31,26 +31,36 @@ export class ReemplaceroService {
   async create(
     dto: Partial<Reemplacero>,
     archivo?: Buffer<ArrayBufferLike>,
+    filename?: string,
+    mimetype?: string,
     descriptor?: number[],
   ): Promise<Reemplacero | null> {
-    dto.archivo = archivo;
-
     dto.descriptor = descriptor;
     const orden = await this.repository.getNextOrderValue();
-    return this.repository.create({ ...dto, orden });
+    return this.repository.create({
+      ...dto,
+      archivo,
+      filename,
+      mimetype,
+      orden,
+    });
   }
 
   async update(
     id: string,
     dto: Partial<Reemplacero>,
     archivo?: Buffer<ArrayBuffer>,
+    filename?: string,
+    mimetype?: string,
     descriptor?: number[],
   ): Promise<[number, Reemplacero[]]> {
-    dto.archivo = archivo;
     dto.descriptor = descriptor;
     return this.repository.update(id, {
       ...dto,
       codigo: !archivo ? undefined : null,
+      archivo,
+      filename,
+      mimetype,
     });
   }
 
@@ -80,7 +90,8 @@ export class ReemplaceroService {
     const data = result.toJSON();
     return {
       id: data.id,
-      fileName: data.archivoNombre,
+      filename: data.filename,
+      mimetype: data.mimetype,
       file: data.archivo,
     };
   }

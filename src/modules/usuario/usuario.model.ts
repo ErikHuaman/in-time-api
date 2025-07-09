@@ -101,10 +101,16 @@ export class Usuario extends Model {
   rol: Rol;
 
   @Column({
-    field: 'archivoNombre',
+    field: 'filename',
     allowNull: true,
   })
-  archivoNombre: string;
+  filename: string;
+
+  @Column({
+    field: 'mimetype',
+    allowNull: true,
+  })
+  mimetype: string;
 
   @Column({
     field: 'archivo',

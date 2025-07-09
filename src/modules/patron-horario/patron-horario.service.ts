@@ -30,6 +30,8 @@ export class PatronHorarioService {
           include: [
             {
               model: BloqueHoras,
+              where: { isActive: true },
+              required: false,
             },
           ],
           required: true,

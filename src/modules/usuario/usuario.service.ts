@@ -28,10 +28,14 @@ import { Asistencia } from '@modules/asistencia/asistencia.model';
 import { CorreccionMarcacion } from '@modules/correccion-marcacion/correccion-marcacion.model';
 import { Vacacion } from '@modules/vacacion/vacacion.model';
 import { PermisoTrabajador } from '@modules/permiso-trabajador/permiso-trabajador.model';
+import { AsignacionSedeUsuarioRepository } from '@modules/asignacion-sede-usuario/asignacion-sede-usuario.repository';
 
 @Injectable()
 export class UsuarioService {
-  constructor(private readonly repository: UsuarioRepository) {}
+  constructor(
+    private readonly repository: UsuarioRepository,
+    private readonly asignacionRepository: AsignacionSedeUsuarioRepository,
+  ) {}
 
   async findAll(
     user: Usuario,
@@ -46,6 +50,15 @@ export class UsuarioService {
         ...(searchTerm && {
           [Op.or]: [
             where(fn('LOWER', col('Usuario.nombre')), {
+              [Op.like]: `%${searchTerm}%`,
+            }),
+            where(fn('LOWER', col('Usuario.apellido')), {
+              [Op.like]: `%${searchTerm}%`,
+            }),
+            where(fn('LOWER', col('Usuario.identificacion')), {
+              [Op.like]: `%${searchTerm}%`,
+            }),
+            where(fn('LOWER', col('Usuario.username')), {
               [Op.like]: `%${searchTerm}%`,
             }),
           ],
@@ -112,15 +125,74 @@ export class UsuarioService {
   async create(
     dto: Partial<Usuario>,
     archivo?: Buffer<ArrayBufferLike>,
+    filename?: string,
+    mimetype?: string,
     descriptor?: number[],
   ): Promise<Usuario | null> {
     try {
-      dto.archivo = archivo;
       dto.descriptor = descriptor;
       const orden = await this.repository.getNextOrderValue();
       dto.username = dto.username?.toLowerCase();
       dto.password = bcrypt.hashSync(dto.password as string, 10);
-      return this.repository.create({ ...dto, orden });
+      const { sedes } = dto;
+
+      const usuario = await this.repository.create({
+        ...dto,
+        archivo,
+        filename,
+        mimetype,
+        orden,
+      });
+
+      if (usuario && sedes && sedes?.length) {
+        // Paso 1: obtener los registros existentes
+        const existentes = await this.asignacionRepository.findAll({
+          where: {
+            idUsuario: usuario.get().id,
+            idSede: {
+              [Op.in]: sedes.map((s) => s.id),
+            },
+          },
+          attributes: ['idSede'],
+        });
+
+        await this.asignacionRepository.bulkDestroy({
+          where: {
+            idUsuario: usuario.get().id,
+            idSede: {
+              [Op.notIn]: sedes.map((dto) => dto.id),
+            },
+          },
+        });
+
+        const existentesIds = new Set(existentes.map((e) => e.get().idSede));
+
+        // Paso 2: filtrar para no duplicar
+        const securedDtoList = await Promise.all(
+          sedes
+            .filter((sede) => !existentesIds.has(sede.id))
+            .map((sede, i) => ({
+              idUsuario: usuario.get().id,
+              idSede: sede.id,
+            })),
+        );
+        // Paso 3: insertar solo los nuevos
+
+        await this.asignacionRepository.bulkCreate(
+          securedDtoList,
+          {
+            individualHooks: true,
+            ignoreDuplicates: true,
+          },
+          {
+            idUsuario: usuario.get().id,
+            idSede: {
+              [Op.in]: sedes.map((dto) => dto.id),
+            },
+          },
+        );
+      }
+      return usuario;
     } catch (error) {
       throw new InternalServerErrorException('Error interno del servidor');
     }
@@ -130,6 +202,8 @@ export class UsuarioService {
     id: string,
     dto: Partial<Usuario>,
     archivo?: Buffer<ArrayBuffer>,
+    filename?: string,
+    mimetype?: string,
     descriptor?: number[],
   ): Promise<[number, Usuario[]]> {
     try {
@@ -144,11 +218,70 @@ export class UsuarioService {
         dto.password = exist?.password; // Mantener la contraseña existente si no se proporciona una nueva
       }
 
-      dto.archivo = archivo;
       dto.descriptor = descriptor;
 
-      return this.repository.update(id, dto);
+      const { sedes } = dto;
+
+      console.log('aqui');
+
+      const usuario = await this.repository.update(id, {
+        ...dto,
+        archivo,
+        filename,
+        mimetype,
+      });
+
+      if (usuario && sedes && sedes?.length) {
+        // Paso 1: obtener los registros existentes
+        const existentes = await this.asignacionRepository.findAll({
+          where: {
+            idUsuario: id,
+            idSede: {
+              [Op.in]: sedes.map((s) => s.id),
+            },
+          },
+          attributes: ['idSede'],
+        });
+
+        await this.asignacionRepository.bulkDestroy({
+          where: {
+            idUsuario: id,
+            idSede: {
+              [Op.notIn]: sedes.map((dto) => dto.id),
+            },
+          },
+        });
+
+        const existentesIds = new Set(existentes.map((e) => e.get().idSede));
+
+        // Paso 2: filtrar para no duplicar
+        const securedDtoList = await Promise.all(
+          sedes
+            .filter((sede) => !existentesIds.has(sede.id))
+            .map((sede, i) => ({
+              idUsuario: id,
+              idSede: sede.id,
+            })),
+        );
+        // Paso 3: insertar solo los nuevos
+
+        await this.asignacionRepository.bulkCreate(
+          securedDtoList,
+          {
+            individualHooks: true,
+            ignoreDuplicates: true,
+          },
+          {
+            idUsuario: id,
+            idSede: {
+              [Op.in]: sedes.map((dto) => dto.id),
+            },
+          },
+        );
+      }
+      return usuario;
     } catch (error) {
+      console.error(error);
       throw new InternalServerErrorException('Error interno del servidor');
     }
   }
@@ -212,7 +345,8 @@ export class UsuarioService {
     const data = result.toJSON();
     return {
       id: data.id,
-      fileName: data.archivoNombre,
+      filename: data.filename,
+      mimetype: data.mimetype,
       file: data.archivo,
     };
   }
@@ -280,15 +414,19 @@ export class UsuarioService {
                 },
                 {
                   model: HorarioTrabajador,
+                  where: { isActive: true },
                   include: [
                     {
                       model: TurnoTrabajo,
                     },
                     {
                       model: HorarioTrabajadorItem,
+                      where: { isActive: true },
                       include: [
                         {
                           model: BloqueHoras,
+                          where: { isActive: true },
+                          required: false,
                         },
                         {
                           model: JustificacionInasistencia,

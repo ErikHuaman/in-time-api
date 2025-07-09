@@ -63,18 +63,24 @@ export class Reemplacero extends Model {
   codigo: string | null;
 
   @Column({
+    field: 'filename',
+    allowNull: true,
+    type: DataType.STRING,
+  })
+  filename: string;
+  
+  @Column({
+    field: 'mimetype',
+    allowNull: true,
+  })
+  mimetype: string;
+
+  @Column({
     field: 'archivo',
     allowNull: true,
     type: DataType.BLOB('long'),
   })
   archivo: Buffer;
-
-  @Column({
-    field: 'archivoNombre',
-    allowNull: true,
-    type: DataType.STRING,
-  })
-  archivoNombre: string;
 
   @Column({
     type: DataType.JSON,

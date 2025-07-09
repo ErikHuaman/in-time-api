@@ -186,7 +186,7 @@ export class AlertaController {
           ...data,
           trabajadores: trabajadores.filter((trabajador) =>
             trabajador.horarios.some((horario) =>
-              horario.items.some((i) => i.sede.id === item.id),
+              horario.items.some((i) => i?.sede?.id === item?.id),
             ),
           ),
         };
@@ -432,7 +432,7 @@ export class AlertaController {
           ...data,
           trabajadores: trabajadores.filter((trabajador) =>
             trabajador.horarios.some((horario) =>
-              horario.items.some((i) => i.sede.id === item.id),
+              horario.items.some((i) => i?.sede?.id === item?.id),
             ),
           ),
         };

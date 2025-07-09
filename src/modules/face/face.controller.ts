@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -19,15 +20,23 @@ export class FaceController {
   @UseInterceptors(FileInterceptor('image'))
   async verify(
     @Param('identificacion') identificacion: string,
-    @Body() dto: MarcacionAsistenciaDTO, 
+    @Body() dto: MarcacionAsistenciaDTO,
     @UploadedFile() file: Express.Multer.File,
   ): Promise<any> {
+
+    console.log("dto", dto);
+
+    if(!file){
+      throw new BadRequestException('La fotografía es obligatoria');
+    }
+
     if (dto.esTrabajador) {
       return this.faceService.compareWithReference(
         identificacion,
         dto,
         file.buffer,
         file.originalname,
+        file.mimetype,
       );
     } else {
       return this.faceService.compareWithReferenceUsuario(
@@ -35,6 +44,7 @@ export class FaceController {
         dto,
         file.buffer,
         file.originalname,
+        file.mimetype,
       );
     }
   }

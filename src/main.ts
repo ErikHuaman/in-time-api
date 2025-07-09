@@ -6,6 +6,7 @@ import { json, urlencoded } from 'express';
 import { ValidationPipe } from '@nestjs/common';
 import { join } from 'path';
 import { ValidationExceptionFilter } from '@common/filters/validation-exception.filter';
+import { envs } from 'config/env';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -19,11 +20,14 @@ async function bootstrap() {
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('swagger', app, documentFactory);
 
-  app.useStaticAssets(join(__dirname, '..', 'public'));
+  app.useStaticAssets(join(process.cwd(), 'public'));
 
   app.use((req, res, next) => {
-    if (!req.originalUrl.startsWith('/v1') && !req.originalUrl.startsWith('/swagger')) {
-      res.sendFile(join(__dirname, '..', 'public', 'index.html'));
+    if (
+      !req.originalUrl.startsWith('/v1') &&
+      !req.originalUrl.startsWith('/swagger')
+    ) {
+      res.sendFile(join(process.cwd(), 'public', 'index.html'));
     } else {
       next();
     }
@@ -51,7 +55,7 @@ async function bootstrap() {
   // Habilitar el manejo de JSON y formularios en NestJS
   app.use(json({ limit: '50mb' })); // Ajusta el límite según necesites
   app.use(urlencoded({ extended: true, limit: '50mb' }));
-  
-  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
+
+  await app.listen(envs.PORT ?? 3000, '0.0.0.0');
 }
 bootstrap();

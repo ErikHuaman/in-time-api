@@ -7,9 +7,10 @@ import { Alerta } from './alerta.model';
 import { AsistenciaModule } from '@modules/asistencia/asistencia.module';
 import { SedeModule } from '@modules/sede/sede.module';
 import { AlertaRepository } from './alerta.repository';
+import { FirebaseModule } from '@core/firebase/firebase.module';
 
 @Module({
-  imports: [SequelizeModule.forFeature([Alerta]), AsistenciaModule, SedeModule],
+  imports: [SequelizeModule.forFeature([Alerta]), AsistenciaModule, SedeModule, FirebaseModule],
   controllers: [AlertaController],
   providers: [AlertaService, AlertaGateway, AlertaRepository],
   exports: [AlertaService, AlertaRepository],

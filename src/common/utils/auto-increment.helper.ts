@@ -8,6 +8,7 @@ export async function getNextOrderValue<T extends Model>(
   const lastItem = await model.findOne({
     where,
     order: [[field, 'DESC']],
+    paranoid: false, // <-- Esto es lo que necesitas
   });
 
   return lastItem ? (lastItem.get(field) as number) + 1 : 1;

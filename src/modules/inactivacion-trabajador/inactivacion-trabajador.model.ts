@@ -57,11 +57,18 @@ export class InactivacionTrabajador extends Model {
   motivoSuspension: string;
 
   @Column({
-    field: 'fechaSuspension',
+    field: 'fechaInicio',
     allowNull: false,
     type: DataType.DATE,
   })
-  fechaSuspension: Date;
+  fechaInicio: Date;
+
+  @Column({
+    field: 'fechaFin',
+    allowNull: true,
+    type: DataType.DATE,
+  })
+  fechaFin: Date;
 
   @Column({
     field: 'nota',
